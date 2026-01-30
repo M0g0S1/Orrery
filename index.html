@@ -44,6 +44,10 @@
         </div>
       </div>
       
+      <div class="ui-top-right">
+        <button class="settings-btn" id="settingsBtn">⚙</button>
+      </div>
+      
       <div class="ui-bottom">
         <div class="time-controls">
           <button class="time-btn" data-speed="0" title="Pause">⏸</button>
@@ -52,6 +56,18 @@
           <button class="time-btn" data-speed="3" title="Fast">▶▶▶</button>
           <button class="time-btn" data-speed="4" title="Ultra">▶▶▶▶</button>
         </div>
+      </div>
+    </div>
+
+    <!-- Settings Panel -->
+    <div id="settingsPanel" style="display: none;">
+      <div class="settings-content">
+        <h3>Settings</h3>
+        <label class="setting-item">
+          <input type="checkbox" id="showClouds" checked />
+          <span>Show Clouds</span>
+        </label>
+        <button class="close-btn" id="closeSettings">Close</button>
       </div>
     </div>
   </div>
