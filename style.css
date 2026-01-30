@@ -1,4 +1,3 @@
-/* Planet History Simulator - Styles */
 :root {
   --bg-space: #000510;
   --bg-dark: #0a0f1a;
@@ -25,7 +24,6 @@ html, body {
   color: var(--text);
 }
 
-/* ===== MAIN MENU ===== */
 #mainMenu {
   position: fixed;
   top: 0;
@@ -124,7 +122,6 @@ html, body {
   transform: translateY(0);
 }
 
-/* ===== GAME VIEW ===== */
 #gameView {
   position: fixed;
   top: 0;
@@ -133,7 +130,6 @@ html, body {
   height: 100%;
 }
 
-/* Progress UI during generation */
 #progressUI {
   position: fixed;
   top: 0;
@@ -192,11 +188,12 @@ html, body {
   margin-top: 8px;
 }
 
-/* Canvas layers */
 #mapCanvas, #cloudsCanvas {
   position: fixed;
   top: 0;
   left: 0;
+  width: 100%;
+  height: 100%;
   display: block;
   image-rendering: -webkit-optimize-contrast;
   image-rendering: crisp-edges;
@@ -207,7 +204,6 @@ html, body {
   z-index: 10;
 }
 
-/* Game UI - HOI4 style */
 #gameUI {
   position: fixed;
   top: 0;
@@ -398,7 +394,6 @@ html, body {
   box-shadow: 0 0 16px rgba(74, 158, 255, 0.4);
 }
 
-/* Responsive */
 @media (max-width: 768px) {
   .game-title {
     font-size: 36px;
