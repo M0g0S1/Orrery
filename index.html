@@ -8,10 +8,32 @@
 </head>
 <body>
   <div id="mainMenu">
+    <div class="stars"></div>
     <div class="menu-content">
-      <h1 class="game-title">PLANET HISTORY SIMULATOR</h1>
-      <p class="game-subtitle">Watch civilizations rise and fall across geological time</p>
-      <button id="playBtn" class="menu-btn">PLAY</button>
+      <div class="title-container">
+        <div class="title-glow"></div>
+        <h1 class="game-title">PLANET HISTORY</h1>
+        <h1 class="game-title game-title-sub">SIMULATOR</h1>
+      </div>
+      <p class="game-subtitle">Command | Observe | Conquer</p>
+      <div class="menu-stats">
+        <div class="stat-item">
+          <span class="stat-label">SIMULATIONS RUN</span>
+          <span class="stat-value">∞</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">CIVILIZATIONS TRACKED</span>
+          <span class="stat-value">∞</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">YEARS SIMULATED</span>
+          <span class="stat-value">∞</span>
+        </div>
+      </div>
+      <button id="playBtn" class="menu-btn">
+        <span class="btn-text">INITIALIZE SIMULATION</span>
+        <span class="btn-subtext">Press to begin</span>
+      </button>
     </div>
   </div>
   <div id="gameView" style="display: none;">
@@ -25,7 +47,6 @@
       </div>
     </div>
     <canvas id="mapCanvas"></canvas>
-    <canvas id="cloudsCanvas"></canvas>
     <div id="gameUI" style="display: none;">
       <div class="ui-top-left">
         <div class="info-box">
@@ -48,17 +69,9 @@
     </div>
     <div id="settingsPanel" style="display: none;">
       <div class="settings-content">
-        <h3>Settings</h3>
-        <label class="setting-item">
-          <input type="checkbox" id="showClouds" checked />
-          <span>Show Clouds</span>
-        </label>
-        <div class="setting-item-slider">
-          <span>Cloud Opacity</span>
-          <input type="range" id="cloudOpacity" min="0" max="1" step="0.05" value="0.5" />
-          <span id="cloudOpacityValue">0.5</span>
-        </div>
-        <button class="close-btn" id="closeSettings">Close</button>
+        <h3>TACTICAL SETTINGS</h3>
+        <p style="color: var(--text-dim); text-align: center; margin-bottom: 20px; font-size: 12px;">Configure simulation parameters</p>
+        <button class="close-btn" id="closeSettings">CLOSE</button>
       </div>
     </div>
   </div>
