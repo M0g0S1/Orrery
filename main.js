@@ -1,3 +1,5 @@
+// Planet History Simulator - Main Game Engine
+
 // ===== CANVAS SETUP =====
 const mapCanvas = document.getElementById('mapCanvas');
 const mapCtx = mapCanvas.getContext('2d', { alpha: false });
@@ -179,56 +181,77 @@ async function generatePlanet() {
   
   const idx = (x, y) => y * MAP_WIDTH + x;
   
-  // STEP 1: Generate base continental shapes with domain warping
+  // STEP 1: Generate base continental shapes with SEAMLESS WRAPPING
   setProgress(0.05, 'Forming continents...');
   
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
       const i = idx(x, y);
       
+      // Seamless wrapping coordinates (using trig functions for smooth wrapping)
       const nx = x / MAP_WIDTH;
       const ny = y / MAP_HEIGHT;
       
+      // Convert to 3D coordinates on sphere surface for seamless wrapping
+      const theta = nx * Math.PI * 2; // 0 to 2π (wraps horizontally)
+      const phi = ny * Math.PI; // 0 to π (vertical)
+      
+      const sx = Math.cos(theta) / (2 * Math.PI);
+      const sy = Math.sin(theta) / (2 * Math.PI);
+      const sz = Math.sin(phi) / Math.PI;
+      
       // Latitude effects
       const lat = Math.abs(ny * 2 - 1);
-      const latWeight = 1 - Math.pow(lat, 1.5) * 0.3; // Less land at poles
+      const latWeight = 1 - Math.pow(lat, 1.5) * 0.3;
       
-      // Large continental masses with domain warping
+      // Large continental masses with seamless noise
       const continentalScale = 2.2;
       const continental = noise.fbm(
-        nx * continentalScale, 
-        ny * continentalScale, 
+        sx * continentalScale, 
+        sz * continentalScale, 
         5, 
         0.55, 
         2.1,
-        0.5  // Domain warp for organic shapes
-      );
+        0.5
+      ) + noise.fbm(
+        sy * continentalScale + 100,
+        sz * continentalScale + 100,
+        3,
+        0.5,
+        2.0
+      ) * 0.3;
       
-      // Medium terrain features
+      // Medium terrain
       const terrainScale = 7;
       const terrain = noise.fbm(
-        nx * terrainScale + 50, 
-        ny * terrainScale + 50, 
+        sx * terrainScale + 50, 
+        sz * terrainScale + 50, 
         5, 
         0.6, 
         2.0
-      );
+      ) + noise.fbm(
+        sy * terrainScale + 150,
+        sz * terrainScale + 150,
+        4,
+        0.55,
+        2.0
+      ) * 0.25;
       
       // Fine details
       const detailScale = 20;
       const detail = noise.fbm(
-        nx * detailScale + 200, 
-        ny * detailScale + 200, 
+        sx * detailScale + 200, 
+        sz * detailScale + 200, 
         4, 
         0.5, 
         2.0
       );
       
       // Combine layers smoothly
-      let elevation = continental * 0.60 + terrain * 0.28 + detail * 0.12;
+      let elevation = continental * 0.55 + terrain * 0.30 + detail * 0.15;
       elevation *= latWeight;
       
-      // Slight equatorial boost
+      // Equatorial boost
       if (lat < 0.35) {
         elevation += 0.08 * (1 - lat / 0.35);
       }
@@ -246,13 +269,13 @@ async function generatePlanet() {
   setProgress(0.30, 'Adjusting sea level...');
   
   const sorted = new Float32Array(height).sort();
-  const seaLevel = sorted[Math.floor(sorted.length * 0.60)]; // ~40% land
+  const seaLevel = sorted[Math.floor(sorted.length * 0.60)];
   
   for (let i = 0; i < height.length; i++) {
     height[i] = (height[i] - seaLevel) * 2.8;
   }
   
-  // STEP 3: Add realistic mountain ranges
+  // STEP 3: Add realistic mountain ranges (seamless)
   setProgress(0.35, 'Raising mountains...');
   
   for (let y = 0; y < MAP_HEIGHT; y++) {
@@ -262,17 +285,28 @@ async function generatePlanet() {
       const ny = y / MAP_HEIGHT;
       
       if (height[i] > 0.05) {
-        // Mountain ridges (using ridged noise)
+        // Seamless mountain noise
+        const theta = nx * Math.PI * 2;
+        const phi = ny * Math.PI;
+        const sx = Math.cos(theta) / (2 * Math.PI);
+        const sy = Math.sin(theta) / (2 * Math.PI);
+        const sz = Math.sin(phi) / Math.PI;
+        
         const mountainScale = 5;
         let mountainNoise = noise.fbm(
-          nx * mountainScale + 300, 
-          ny * mountainScale + 300, 
+          sx * mountainScale + 300, 
+          sz * mountainScale + 300, 
           4, 
           0.5, 
           2.2
-        );
+        ) + noise.fbm(
+          sy * mountainScale + 400,
+          sz * mountainScale + 400,
+          3,
+          0.5,
+          2.0
+        ) * 0.3;
         
-        // Ridged effect (absolute value creates ridges)
         mountainNoise = 1 - Math.abs(mountainNoise);
         mountainNoise = Math.pow(mountainNoise, 2.5);
         
@@ -295,18 +329,20 @@ async function generatePlanet() {
     for (let x = 0; x < MAP_WIDTH; x++) {
       const i = idx(x, y);
       
-      let temp = 1 - lat * 1.3; // Base from latitude
+      let temp = 1 - lat * 1.3;
       
       if (height[i] > 0) {
-        temp -= height[i] * 0.45; // Elevation cooling
+        temp -= height[i] * 0.45;
       } else {
-        temp += 0.12; // Ocean moderation
+        temp += 0.12;
       }
       
-      // Add slight variation
+      // Seamless temperature variation
       const nx = x / MAP_WIDTH;
-      const ny = y / MAP_HEIGHT;
-      temp += noise.noise(nx * 8 + 400, ny * 8 + 400) * 0.08;
+      const theta = nx * Math.PI * 2;
+      const sx = Math.cos(theta) / (2 * Math.PI);
+      const sy = Math.sin(theta) / (2 * Math.PI);
+      temp += noise.noise(sx * 8 + 400, sy * 8 + 400) * 0.08;
       
       temperature[i] = Math.max(-1, Math.min(1, temp));
     }
@@ -317,7 +353,7 @@ async function generatePlanet() {
     }
   }
   
-  // STEP 5: Moisture/precipitation
+  // STEP 5: Moisture/precipitation (seamless)
   setProgress(0.60, 'Simulating climate...');
   
   for (let y = 0; y < MAP_HEIGHT; y++) {
@@ -327,24 +363,27 @@ async function generatePlanet() {
       const ny = y / MAP_HEIGHT;
       const lat = Math.abs((y / MAP_HEIGHT) * 2 - 1);
       
-      // Base precipitation pattern
-      let precip = noise.fbm(nx * 5 + 500, ny * 5 + 500, 4, 0.5, 2.0);
-      precip = (precip + 1) / 2; // 0-1 range
+      // Seamless precipitation
+      const theta = nx * Math.PI * 2;
+      const phi = ny * Math.PI;
+      const sx = Math.cos(theta) / (2 * Math.PI);
+      const sy = Math.sin(theta) / (2 * Math.PI);
+      const sz = Math.sin(phi) / Math.PI;
       
-      // More rain near equator
+      let precip = noise.fbm(sx * 5 + 500, sz * 5 + 500, 4, 0.5, 2.0);
+      precip += noise.fbm(sy * 5 + 600, sz * 5 + 600, 3, 0.5, 2.0) * 0.3;
+      precip = (precip + 1) / 2;
+      
       precip *= 1.2 - lat * 0.6;
       
-      // Coastal moisture
       if (height[i] > 0 && height[i] < 0.15) {
         precip += 0.25;
       }
       
-      // Rain shadow (mountains block moisture)
       if (height[i] > 0.5) {
         precip *= 0.5;
       }
       
-      // Ocean has moisture but not "precipitation"
       if (height[i] < 0) {
         precip = 0.6;
       }
@@ -362,7 +401,7 @@ async function generatePlanet() {
   setProgress(0.75, 'Rendering planet...');
   await renderPlanetTexture(height, temperature, moisture);
   
-  // STEP 7: Generate clouds layer
+  // STEP 7: Generate clouds layer (seamless)
   setProgress(0.90, 'Generating clouds...');
   await generateClouds(rng, noise);
   
@@ -485,7 +524,7 @@ async function renderPlanetTexture(height, temperature, moisture) {
   mapCtx.drawImage(textureCanvas, 0, 0);
 }
 
-// ===== GENERATE CLOUD LAYER =====
+// ===== GENERATE CLOUD LAYER (SEAMLESS) =====
 async function generateClouds(rng, noise) {
   // Create a separate canvas for the cloud texture
   const cloudTextureCanvas = document.createElement('canvas');
@@ -504,8 +543,16 @@ async function generateClouds(rng, noise) {
       const nx = x / MAP_WIDTH;
       const ny = y / MAP_HEIGHT;
       
-      // Cloud noise (separate from terrain)
-      const cloudDensity = noise.fbm(nx * 8 + 1000, ny * 8 + 1000, 4, 0.6, 2.1);
+      // Convert to seamless spherical coordinates
+      const theta = nx * Math.PI * 2;
+      const phi = ny * Math.PI;
+      const sx = Math.cos(theta) / (2 * Math.PI);
+      const sy = Math.sin(theta) / (2 * Math.PI);
+      const sz = Math.sin(phi) / Math.PI;
+      
+      // Seamless cloud noise
+      const cloudDensity = noise.fbm(sx * 8 + 1000, sz * 8 + 1000, 4, 0.6, 2.1) +
+                          noise.fbm(sy * 8 + 1100, sz * 8 + 1100, 3, 0.55, 2.0) * 0.4;
       
       // More clouds near equator
       const lat = Math.abs(ny * 2 - 1);
@@ -534,20 +581,36 @@ async function generateClouds(rng, noise) {
 // Store the base planet texture separately
 let basePlanetTexture = null;
 let baseCloudTexture = null;
+let showClouds = true;
 
-// ===== CAMERA SYSTEM (HOI4-style) =====
+// ===== CAMERA SYSTEM (HOI4-style with fixed aspect ratio) =====
 function renderCamera() {
   if (!basePlanetTexture) return;
   
   const screenWidth = window.innerWidth;
   const screenHeight = window.innerHeight;
   
-  // Calculate zoom
-  const zoomedWidth = MAP_WIDTH * camera.zoom;
-  const zoomedHeight = MAP_HEIGHT * camera.zoom;
+  // Calculate display size to maintain aspect ratio
+  const mapAspect = MAP_WIDTH / MAP_HEIGHT;
+  const screenAspect = screenWidth / screenHeight;
+  
+  let displayWidth, displayHeight;
+  if (screenAspect > mapAspect) {
+    // Screen is wider than map
+    displayHeight = screenHeight;
+    displayWidth = displayHeight * mapAspect;
+  } else {
+    // Screen is taller than map
+    displayWidth = screenWidth;
+    displayHeight = displayWidth / mapAspect;
+  }
+  
+  // Apply zoom to display size
+  displayWidth *= camera.zoom;
+  displayHeight *= camera.zoom;
   
   // Clamp Y (no vertical wrapping)
-  const maxY = Math.max(0, zoomedHeight - screenHeight);
+  const maxY = Math.max(0, MAP_HEIGHT - (screenHeight / camera.zoom));
   camera.y = Math.max(0, Math.min(maxY, camera.y));
   
   // X wraps infinitely
@@ -557,32 +620,36 @@ function renderCamera() {
   mapCtx.fillStyle = '#081420';
   mapCtx.fillRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
   
-  // Calculate what portion of the base texture to show
-  const sourceX = camera.x;
-  const sourceY = camera.y;
-  const sourceWidth = Math.min(MAP_WIDTH, screenWidth / camera.zoom);
-  const sourceHeight = Math.min(MAP_HEIGHT, screenHeight / camera.zoom);
+  // Calculate visible portion
+  const viewWidth = screenWidth / camera.zoom;
+  const viewHeight = screenHeight / camera.zoom;
   
-  // Draw main view
+  // Draw main portion
+  const sx = camera.x;
+  const sy = camera.y;
+  const sw = Math.min(viewWidth, MAP_WIDTH - sx);
+  const sh = Math.min(viewHeight, MAP_HEIGHT - sy);
+  
   mapCtx.drawImage(
     basePlanetTexture,
-    sourceX, sourceY, sourceWidth, sourceHeight,
-    0, 0, MAP_WIDTH, MAP_HEIGHT
+    sx, sy, sw, sh,
+    0, 0, sw * camera.zoom, sh * camera.zoom
   );
   
   // Handle horizontal wrapping
-  if (sourceX + sourceWidth > MAP_WIDTH) {
-    const wrapWidth = (sourceX + sourceWidth) - MAP_WIDTH;
+  if (sx + viewWidth > MAP_WIDTH) {
+    const wrapWidth = (sx + viewWidth) - MAP_WIDTH;
     mapCtx.drawImage(
       basePlanetTexture,
-      0, sourceY, wrapWidth, sourceHeight,
-      (sourceWidth - wrapWidth) * (MAP_WIDTH / sourceWidth), 0, 
-      wrapWidth * (MAP_WIDTH / sourceWidth), MAP_HEIGHT
+      0, sy, wrapWidth, sh,
+      sw * camera.zoom, 0, wrapWidth * camera.zoom, sh * camera.zoom
     );
   }
   
-  // Render clouds
-  renderClouds();
+  // Render clouds if enabled
+  if (showClouds) {
+    renderClouds();
+  }
 }
 
 function renderClouds() {
@@ -594,31 +661,29 @@ function renderClouds() {
   // Clear clouds canvas
   cloudsCtx.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
   
-  const zoomedWidth = MAP_WIDTH * camera.zoom;
-  const zoomedHeight = MAP_HEIGHT * camera.zoom;
-  
-  const sourceWidth = Math.min(MAP_WIDTH, screenWidth / camera.zoom);
-  const sourceHeight = Math.min(MAP_HEIGHT, screenHeight / camera.zoom);
+  const viewWidth = screenWidth / camera.zoom;
+  const viewHeight = screenHeight / camera.zoom;
   
   // Cloud offset for animation
   const cloudX = (camera.x + cloudOffset) % MAP_WIDTH;
-  const sourceY = camera.y;
+  const sy = camera.y;
+  const sw = Math.min(viewWidth, MAP_WIDTH - cloudX);
+  const sh = Math.min(viewHeight, MAP_HEIGHT - sy);
   
   // Draw main clouds
   cloudsCtx.drawImage(
     baseCloudTexture,
-    cloudX, sourceY, sourceWidth, sourceHeight,
-    0, 0, MAP_WIDTH, MAP_HEIGHT
+    cloudX, sy, sw, sh,
+    0, 0, sw * camera.zoom, sh * camera.zoom
   );
   
   // Handle wrapping
-  if (cloudX + sourceWidth > MAP_WIDTH) {
-    const wrapWidth = (cloudX + sourceWidth) - MAP_WIDTH;
+  if (cloudX + viewWidth > MAP_WIDTH) {
+    const wrapWidth = (cloudX + viewWidth) - MAP_WIDTH;
     cloudsCtx.drawImage(
       baseCloudTexture,
-      0, sourceY, wrapWidth, sourceHeight,
-      (sourceWidth - wrapWidth) * (MAP_WIDTH / sourceWidth), 0,
-      wrapWidth * (MAP_WIDTH / sourceWidth), MAP_HEIGHT
+      0, sy, wrapWidth, sh,
+      sw * camera.zoom, 0, wrapWidth * camera.zoom, sh * camera.zoom
     );
   }
 }
@@ -728,4 +793,29 @@ document.querySelectorAll('.time-btn').forEach(btn => {
     btn.classList.add('active');
     // Speed control will be implemented with simulation
   });
+});
+
+// Settings menu
+document.getElementById('settingsBtn').addEventListener('click', () => {
+  document.getElementById('settingsPanel').style.display = 'flex';
+});
+
+document.getElementById('closeSettings').addEventListener('click', () => {
+  document.getElementById('settingsPanel').style.display = 'none';
+});
+
+document.getElementById('showClouds').addEventListener('change', (e) => {
+  showClouds = e.target.checked;
+  if (!showClouds) {
+    cloudsCtx.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+  } else {
+    renderCamera();
+  }
+});
+
+// Close settings on background click
+document.getElementById('settingsPanel').addEventListener('click', (e) => {
+  if (e.target.id === 'settingsPanel') {
+    document.getElementById('settingsPanel').style.display = 'none';
+  }
 });
