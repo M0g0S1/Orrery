@@ -23,6 +23,70 @@ let basePlanetTexture = null;
 let worldRng = null;
 let worldNoise = null;
 
+// ============================================
+// GAME STATE & SIMULATION
+// ============================================
+
+let gameState = {
+  year: 0,
+  running: false,
+  speed: 2, // 0=pause, 1=slow, 2=normal, 3=fast, 4=ultra
+  tribes: [],
+  countries: [],
+  events: []
+};
+
+const SPEEDS = {
+  0: 0,      // paused
+  1: 1,      // slow (1 tick/sec)
+  2: 4,      // normal (4 ticks/sec)
+  3: 10,     // fast (10 ticks/sec)
+  4: 30      // ultra (30 ticks/sec)
+};
+
+class Tribe {
+  constructor(id, x, y, population, rng) {
+    this.id = id;
+    this.x = x; // tile coordinates
+    this.y = y;
+    this.population = population;
+    this.culture = generateCultureName(rng);
+    this.techLevel = 0; // primitive
+    this.age = 0; // years existed
+    this.settled = false;
+    this.settlementYears = 0; // years staying in same spot
+    
+    // Migration intent
+    this.targetX = null;
+    this.targetY = null;
+    this.migrationCooldown = 0;
+  }
+}
+
+class Country {
+  constructor(id, name, capitalX, capitalY, color) {
+    this.id = id;
+    this.name = name;
+    this.capitalX = capitalX;
+    this.capitalY = capitalY;
+    this.color = color; // for borders
+    this.population = 0;
+    this.territories = []; // array of tile indices
+    this.government = 'tribal'; // tribal → chiefdom → kingdom → etc
+    this.techLevel = 0;
+    this.resources = { food: 0, wood: 0, stone: 0, metal: 0 };
+    this.leader = null;
+  }
+}
+
+function generateCultureName(rng) {
+  const prefixes = ['Aka', 'Uru', 'Zul', 'Mor', 'Tek', 'Nal', 'Kra', 'Vec', 'Dro', 'Fen'];
+  const suffixes = ['ni', 'ka', 'tu', 'ma', 'ri', 'lo', 'sa', 'nu', 'ta', 'ko'];
+  const prefix = prefixes[Math.floor(rng.next() * prefixes.length)];
+  const suffix = suffixes[Math.floor(rng.next() * suffixes.length)];
+  return prefix + suffix;
+}
+
 const planetPrefixes = [
   'Terra', 'Gaia', 'Kepler', 'Proxima', 'Trappist', 'Nova', 'Aurora', 'Celestia',
   'Olympus', 'Elysium', 'Arcadia', 'Avalon', 'Eden', 'Valhalla', 'Asgard', 'Midgard',
@@ -512,6 +576,228 @@ async function generateTileSystem(height, temperature, moisture, rivers, rng) {
   return tiles;
 }
 
+// ============================================
+// TRIBE SPAWNING
+// ============================================
+
+function spawnInitialTribes(tiles, rng) {
+  const tribes = [];
+  const numTribes = Math.floor(rng.range(40, 80));
+  
+  // Find habitable tiles for spawning
+  const habitableTiles = tiles.filter(tile => 
+    tile.isLand && 
+    tile.habitability > 0.3 &&
+    tile.biomeType !== 'ice' &&
+    tile.biomeType !== 'alpine'
+  );
+  
+  // Sort by habitability
+  habitableTiles.sort((a, b) => b.habitability - a.habitability);
+  
+  // Spawn tribes in best locations
+  for (let i = 0; i < numTribes && i < habitableTiles.length; i++) {
+    const tile = habitableTiles[Math.floor(rng.next() * Math.min(habitableTiles.length, 200))];
+    
+    const population = Math.floor(rng.range(50, 200));
+    const tribe = new Tribe(i, tile.x, tile.y, population, rng);
+    
+    // Prefer river valleys and coasts
+    if (tile.riverPresence === 'major') {
+      tribe.population *= 1.5;
+    } else if (tile.riverPresence === 'minor') {
+      tribe.population *= 1.2;
+    }
+    
+    if (tile.distanceToCoast < 3) {
+      tribe.population *= 1.2;
+    }
+    
+    tribe.population = Math.floor(tribe.population);
+    tribes.push(tribe);
+  }
+  
+  return tribes;
+}
+
+// ============================================
+// SIMULATION TICK
+// ============================================
+
+function getTileAt(tiles, x, y) {
+  const index = y * TILE_WIDTH + x;
+  return tiles[index];
+}
+
+function simulateTick(tiles) {
+  if (!gameState.running) return;
+  
+  gameState.year += 1;
+  
+  // Update all tribes
+  for (let i = gameState.tribes.length - 1; i >= 0; i--) {
+    const tribe = gameState.tribes[i];
+    tribe.age++;
+    
+    const currentTile = getTileAt(tiles, tribe.x, tribe.y);
+    
+    // Population growth
+    if (currentTile.isLand) {
+      const growthRate = currentTile.foodPotential * 0.02;
+      tribe.population += Math.floor(tribe.population * growthRate);
+      
+      // Random events can reduce population
+      if (worldRng.next() < 0.01) {
+        tribe.population = Math.floor(tribe.population * 0.9); // disease/famine
+      }
+    }
+    
+    // Death if population too low
+    if (tribe.population < 10) {
+      gameState.tribes.splice(i, 1);
+      continue;
+    }
+    
+    // Settlement check - if staying in one spot long enough
+    if (!tribe.settled) {
+      if (tribe.migrationCooldown > 0) {
+        tribe.migrationCooldown--;
+        tribe.settlementYears++;
+        
+        // After 50 years in same spot, consider settling
+        if (tribe.settlementYears > 50 && currentTile.habitability > 0.5) {
+          tribe.settled = true;
+          // TODO: Form proto-state/village
+        }
+      } else {
+        // Time to migrate
+        migrateTribe(tribe, tiles);
+      }
+    }
+    
+    // Splitting - if population gets too large
+    if (tribe.population > 500 && worldRng.next() < 0.05) {
+      splitTribe(tribe, tiles);
+    }
+  }
+  
+  // Check for tribe mergers
+  checkTribeMergers(tiles);
+  
+  // Update UI
+  updateGameUI();
+}
+
+function migrateTribe(tribe, tiles) {
+  const currentTile = getTileAt(tiles, tribe.x, tribe.y);
+  
+  // Find best neighboring tile
+  const neighbors = [];
+  const checkRadius = 2;
+  
+  for (let dy = -checkRadius; dy <= checkRadius; dy++) {
+    for (let dx = -checkRadius; dx <= checkRadius; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      
+      const nx = (tribe.x + dx + TILE_WIDTH) % TILE_WIDTH;
+      const ny = tribe.y + dy;
+      
+      if (ny < 0 || ny >= TILE_HEIGHT) continue;
+      
+      const tile = getTileAt(tiles, nx, ny);
+      
+      if (!tile.isLand) continue;
+      
+      // Score this tile
+      let score = tile.habitability * 100;
+      
+      // Prefer rivers
+      if (tile.riverPresence === 'major') score += 50;
+      else if (tile.riverPresence === 'minor') score += 25;
+      
+      // Prefer coasts
+      if (tile.distanceToCoast < 2) score += 30;
+      
+      // Avoid bad biomes
+      if (tile.biomeType === 'desert') score -= 40;
+      if (tile.biomeType === 'ice' || tile.biomeType === 'tundra') score -= 60;
+      
+      // Avoid mountains
+      if (tile.roughness > 0.5) score -= 30;
+      
+      neighbors.push({ tile, x: nx, y: ny, score });
+    }
+  }
+  
+  if (neighbors.length === 0) return;
+  
+  // Sort by score
+  neighbors.sort((a, b) => b.score - a.score);
+  
+  // Pick from top choices with some randomness
+  const choice = neighbors[Math.floor(worldRng.next() * Math.min(3, neighbors.length))];
+  
+  // Move tribe
+  tribe.x = choice.x;
+  tribe.y = choice.y;
+  tribe.migrationCooldown = Math.floor(worldRng.range(10, 30)); // Stay for a while
+  tribe.settlementYears = 0;
+}
+
+function splitTribe(tribe, tiles) {
+  const newPopulation = Math.floor(tribe.population * 0.4);
+  tribe.population -= newPopulation;
+  
+  const newTribe = new Tribe(
+    gameState.tribes.length,
+    tribe.x,
+    tribe.y,
+    newPopulation,
+    worldRng
+  );
+  
+  newTribe.culture = tribe.culture; // Inherit culture
+  newTribe.techLevel = tribe.techLevel;
+  
+  gameState.tribes.push(newTribe);
+  
+  // New tribe migrates immediately
+  newTribe.migrationCooldown = 0;
+}
+
+function checkTribeMergers(tiles) {
+  for (let i = 0; i < gameState.tribes.length; i++) {
+    for (let j = i + 1; j < gameState.tribes.length; j++) {
+      const t1 = gameState.tribes[i];
+      const t2 = gameState.tribes[j];
+      
+      // Check if in same location
+      if (t1.x === t2.x && t1.y === t2.y) {
+        // Check if compatible (same culture or both very small)
+        if (t1.culture === t2.culture || (t1.population < 100 && t2.population < 100)) {
+          // Merge into larger tribe
+          if (t1.population >= t2.population) {
+            t1.population += t2.population;
+            gameState.tribes.splice(j, 1);
+          } else {
+            t2.population += t1.population;
+            gameState.tribes.splice(i, 1);
+          }
+          return; // Only one merge per tick
+        }
+      }
+    }
+  }
+}
+
+function updateGameUI() {
+  const tribeCount = gameState.tribes.length;
+  const countryCount = gameState.countries.length;
+  
+  document.getElementById('worldStats').textContent = 
+    `Year ${gameState.year} | Tribes: ${tribeCount} | Countries: ${countryCount}`;
+}
+
 async function generatePlanet() {
   const seed = Date.now();
   const rng = new Random(seed);
@@ -700,14 +986,19 @@ async function generatePlanet() {
   setProgress(0.75, 'Creating tile system...');
   const tiles = await generateTileSystem(height, temperature, moisture, rivers, rng);
   
-  setProgress(0.80, 'Rendering planet...');
+  setProgress(0.85, 'Spawning tribes...');
+  const tribes = spawnInitialTribes(tiles, rng);
+  gameState.tribes = tribes;
+  gameState.year = 0;
+  
+  setProgress(0.90, 'Rendering planet...');
   await renderPlanetTexture(height, temperature, moisture, rivers);
   
   planetData = { height, temperature, moisture, rivers, tiles, seed };
   
   const planetName = generatePlanetName(rng);
   document.getElementById('worldName').textContent = planetName;
-  document.getElementById('worldStats').textContent = `Tiles: ${tiles.length} | Rivers: ${rivers.length}`;
+  updateGameUI();
   
   setProgress(1, 'Complete!');
   return planetData;
@@ -949,14 +1240,54 @@ document.getElementById('playBtn').addEventListener('click', async () => {
     
     renderCamera();
     
+    // Start simulation
+    gameState.running = true;
+    startGameLoop();
+    
   } catch (err) {
     console.error(err);
     setProgress(0, 'Error: ' + err.message);
   }
 });
 
+// ============================================
+// GAME LOOP
+// ============================================
+
+let lastTickTime = 0;
+
+function startGameLoop() {
+  lastTickTime = Date.now();
+  requestAnimationFrame(gameLoop);
+}
+
+function gameLoop() {
+  const now = Date.now();
+  const speed = SPEEDS[gameState.speed];
+  
+  if (speed > 0 && gameState.running) {
+    const interval = 1000 / speed; // ms per tick
+    
+    if (now - lastTickTime >= interval) {
+      simulateTick(planetData.tiles);
+      lastTickTime = now;
+    }
+  }
+  
+  requestAnimationFrame(gameLoop);
+}
+
 document.querySelectorAll('.time-btn').forEach(btn => {
   btn.addEventListener('click', () => {
+    const speed = parseInt(btn.getAttribute('data-speed'));
+    gameState.speed = speed;
+    
+    if (speed === 0) {
+      gameState.running = false;
+    } else {
+      gameState.running = true;
+    }
+    
     document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
   });
