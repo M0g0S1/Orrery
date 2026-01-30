@@ -2,20 +2,60 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Planet Generator</title>
+  <title>Planet History Simulator</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-  <div id="ui">
-    <h1>Planet Generator</h1>
-    <button id="generateBtn">Generate New Planet</button>
-    <div id="progressWrap">
-      <div id="progressBar"></div>
-      <div id="progressText">Click Generate to create a planet</div>
+  <!-- Main Menu -->
+  <div id="mainMenu">
+    <div class="menu-content">
+      <h1 class="game-title">PLANET HISTORY SIMULATOR</h1>
+      <p class="game-subtitle">Watch civilizations rise and fall across geological time</p>
+      <button id="playBtn" class="menu-btn">PLAY</button>
     </div>
   </div>
-  <canvas id="mapCanvas"></canvas>
+
+  <!-- Game View -->
+  <div id="gameView" style="display: none;">
+    <!-- Progress UI -->
+    <div id="progressUI">
+      <div class="progress-content">
+        <h2>Generating Planet</h2>
+        <div id="progressWrap">
+          <div id="progressBar"></div>
+        </div>
+        <div id="progressText">Initializing...</div>
+      </div>
+    </div>
+
+    <!-- Canvas for planet -->
+    <canvas id="mapCanvas"></canvas>
+    
+    <!-- Moving clouds layer -->
+    <canvas id="cloudsCanvas"></canvas>
+
+    <!-- Game UI (appears after generation) -->
+    <div id="gameUI" style="display: none;">
+      <div class="ui-top-left">
+        <div class="info-box">
+          <div class="world-name" id="worldName">Planet Kepler-442b</div>
+          <div class="world-stats" id="worldStats">Year 0 | Tribes: 0</div>
+        </div>
+      </div>
+      
+      <div class="ui-bottom">
+        <div class="time-controls">
+          <button class="time-btn" data-speed="0" title="Pause">⏸</button>
+          <button class="time-btn" data-speed="1" title="Slow">▶</button>
+          <button class="time-btn active" data-speed="2" title="Normal">▶▶</button>
+          <button class="time-btn" data-speed="3" title="Fast">▶▶▶</button>
+          <button class="time-btn" data-speed="4" title="Ultra">▶▶▶▶</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <script src="main.js"></script>
 </body>
 </html>
