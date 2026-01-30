@@ -193,6 +193,156 @@ class PerlinNoise {
   }
 }
 
+// ============================================
+// TECTONIC PLATE SYSTEM
+// ============================================
+
+class TectonicPlate {
+  constructor(id, centerX, centerY, type, velocityX, velocityY) {
+    this.id = id;
+    this.centerX = centerX;
+    this.centerY = centerY;
+    this.type = type; // 'continental' or 'oceanic'
+    this.velocityX = velocityX;
+    this.velocityY = velocityY;
+    this.baseElevation = type === 'continental' ? 0.15 : -0.05;
+  }
+}
+
+function generateTectonicPlates(rng, numPlates = 12) {
+  const plates = [];
+  
+  for (let i = 0; i < numPlates; i++) {
+    const x = rng.next() * MAP_WIDTH;
+    const y = rng.next() * MAP_HEIGHT;
+    
+    // More continental plates in temperate zones
+    const lat = Math.abs((y / MAP_HEIGHT) * 2 - 1);
+    const isContinental = (lat < 0.6 && rng.next() > 0.4) || rng.next() > 0.65;
+    const type = isContinental ? 'continental' : 'oceanic';
+    
+    // Random plate motion
+    const angle = rng.next() * Math.PI * 2;
+    const speed = rng.range(0.3, 1.2);
+    const vx = Math.cos(angle) * speed;
+    const vy = Math.sin(angle) * speed;
+    
+    plates.push(new TectonicPlate(i, x, y, type, vx, vy));
+  }
+  
+  return plates;
+}
+
+function assignPlatesToTiles(plates) {
+  const plateMap = new Uint8Array(MAP_WIDTH * MAP_HEIGHT);
+  
+  // Voronoi diagram: assign each pixel to nearest plate center
+  for (let y = 0; y < MAP_HEIGHT; y++) {
+    for (let x = 0; x < MAP_WIDTH; x++) {
+      const i = y * MAP_WIDTH + x;
+      
+      let minDist = Infinity;
+      let closestPlate = 0;
+      
+      for (let p = 0; p < plates.length; p++) {
+        const plate = plates[p];
+        
+        // Handle wrapping on X axis
+        let dx = Math.abs(x - plate.centerX);
+        if (dx > MAP_WIDTH / 2) dx = MAP_WIDTH - dx;
+        
+        const dy = y - plate.centerY;
+        const dist = dx * dx + dy * dy;
+        
+        if (dist < minDist) {
+          minDist = dist;
+          closestPlate = p;
+        }
+      }
+      
+      plateMap[i] = closestPlate;
+    }
+  }
+  
+  return plateMap;
+}
+
+function detectPlateBoundaries(plateMap, plates) {
+  const boundaries = new Uint8Array(MAP_WIDTH * MAP_HEIGHT);
+  const boundaryType = new Uint8Array(MAP_WIDTH * MAP_HEIGHT);
+  // 0 = interior, 1 = convergent, 2 = divergent, 3 = transform
+  
+  const idx = (x, y) => {
+    x = (x + MAP_WIDTH) % MAP_WIDTH; // wrap X
+    y = Math.max(0, Math.min(MAP_HEIGHT - 1, y)); // clamp Y
+    return y * MAP_WIDTH + x;
+  };
+  
+  for (let y = 1; y < MAP_HEIGHT - 1; y++) {
+    for (let x = 0; x < MAP_WIDTH; x++) {
+      const i = idx(x, y);
+      const myPlate = plateMap[i];
+      
+      // Check neighbors
+      const neighbors = [
+        plateMap[idx(x - 1, y)],
+        plateMap[idx(x + 1, y)],
+        plateMap[idx(x, y - 1)],
+        plateMap[idx(x, y + 1)]
+      ];
+      
+      const isDifferent = neighbors.some(n => n !== myPlate);
+      
+      if (isDifferent) {
+        boundaries[i] = 1;
+        
+        // Determine boundary type based on plate velocities
+        const otherPlate = neighbors.find(n => n !== myPlate);
+        if (otherPlate !== undefined) {
+          const p1 = plates[myPlate];
+          const p2 = plates[otherPlate];
+          
+          // Calculate relative velocity
+          const relVx = p2.velocityX - p1.velocityX;
+          const relVy = p2.velocityY - p1.velocityY;
+          
+          // Vector from plate center to boundary
+          const toX = x - p1.centerX;
+          const toY = y - p1.centerY;
+          const len = Math.sqrt(toX * toX + toY * toY);
+          const normX = len > 0 ? toX / len : 0;
+          const normY = len > 0 ? toY / len : 0;
+          
+          // Dot product to see if converging or diverging
+          const dot = relVx * normX + relVy * normY;
+          
+          if (dot > 0.3) {
+            boundaryType[i] = 2; // divergent
+          } else if (dot < -0.3) {
+            boundaryType[i] = 1; // convergent
+          } else {
+            boundaryType[i] = 3; // transform
+          }
+        }
+      }
+    }
+  }
+  
+  return { boundaries, boundaryType };
+}
+
+function generateHotspots(rng, numHotspots = 6) {
+  const hotspots = [];
+  for (let i = 0; i < numHotspots; i++) {
+    hotspots.push({
+      x: rng.next() * MAP_WIDTH,
+      y: rng.next() * MAP_HEIGHT,
+      strength: rng.range(0.15, 0.35)
+    });
+  }
+  return hotspots;
+}
+
 async function generatePlanet() {
   const seed = Date.now();
   const rng = new Random(seed);
@@ -209,111 +359,191 @@ async function generatePlanet() {
   
   const idx = (x, y) => y * MAP_WIDTH + x;
   
-  setProgress(0.05, 'Forming continents...');
+  // STEP 1: Generate tectonic plates
+  setProgress(0.05, 'Generating tectonic plates...');
+  const numPlates = Math.floor(rng.range(10, 16));
+  const plates = generateTectonicPlates(rng, numPlates);
   
+  setProgress(0.10, 'Assigning plate territories...');
+  const plateMap = assignPlatesToTiles(plates);
+  
+  setProgress(0.15, 'Detecting plate boundaries...');
+  const { boundaries, boundaryType } = detectPlateBoundaries(plateMap, plates);
+  
+  setProgress(0.20, 'Placing volcanic hotspots...');
+  const hotspots = generateHotspots(rng, Math.floor(rng.range(4, 8)));
+  
+  // STEP 2: Base elevation from plate type
+  setProgress(0.25, 'Setting base plate elevations...');
+  for (let y = 0; y < MAP_HEIGHT; y++) {
+    for (let x = 0; x < MAP_WIDTH; x++) {
+      const i = idx(x, y);
+      const plate = plates[plateMap[i]];
+      height[i] = plate.baseElevation;
+    }
+  }
+  
+  // STEP 3: Apply tectonic forces at boundaries
+  setProgress(0.30, 'Simulating tectonic collisions...');
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
       const i = idx(x, y);
       
-      const nx = x / MAP_WIDTH;
-      const ny = y / MAP_HEIGHT;
-      
-      const lat = Math.abs(ny * 2 - 1);
-      const latWeight = 1 - Math.pow(lat, 1.5) * 0.3;
-      
-      const continentalScale = 2.2;
-      const continental = noise.fbm(
-        nx * continentalScale, 
-        ny * continentalScale, 
-        5, 
-        0.55, 
-        2.1,
-        0.5
-      );
-      
-      const terrainScale = 7;
-      const terrain = noise.fbm(
-        nx * terrainScale + 50, 
-        ny * terrainScale + 50, 
-        5, 
-        0.6, 
-        2.0
-      );
-      
-      const detailScale = 20;
-      const detail = noise.fbm(
-        nx * detailScale + 200, 
-        ny * detailScale + 200, 
-        4, 
-        0.5, 
-        2.0
-      );
-      
-      let elevation = continental * 0.60 + terrain * 0.28 + detail * 0.12;
-      elevation *= latWeight;
-      
-      if (lat < 0.35) {
-        elevation += 0.08 * (1 - lat / 0.35);
+      if (boundaries[i]) {
+        const bType = boundaryType[i];
+        const myPlate = plates[plateMap[i]];
+        
+        // Find neighboring plate
+        let otherPlate = null;
+        const neighbors = [
+          plateMap[idx((x - 1 + MAP_WIDTH) % MAP_WIDTH, y)],
+          plateMap[idx((x + 1) % MAP_WIDTH, y)],
+          plateMap[idx(x, Math.max(0, y - 1))],
+          plateMap[idx(x, Math.min(MAP_HEIGHT - 1, y + 1))]
+        ];
+        for (const nid of neighbors) {
+          if (nid !== plateMap[i]) {
+            otherPlate = plates[nid];
+            break;
+          }
+        }
+        
+        if (otherPlate) {
+          if (bType === 1) { // Convergent
+            if (myPlate.type === 'continental' && otherPlate.type === 'continental') {
+              // Continental collision → major mountain range
+              height[i] += rng.range(0.5, 0.85);
+            } else if (myPlate.type === 'continental' || otherPlate.type === 'continental') {
+              // Subduction → volcanic arc + mountains
+              height[i] += rng.range(0.3, 0.6);
+            } else {
+              // Ocean-ocean collision → island arc
+              height[i] += rng.range(0.15, 0.35);
+            }
+          } else if (bType === 2) { // Divergent
+            // Mid-ocean ridge or rift valley
+            if (myPlate.type === 'oceanic' && otherPlate.type === 'oceanic') {
+              height[i] += rng.range(0.08, 0.18); // ridge
+            } else {
+              height[i] -= rng.range(0.05, 0.15); // rift valley
+            }
+          } else if (bType === 3) { // Transform
+            // Fault lines - slight variation
+            height[i] += rng.range(-0.05, 0.08);
+          }
+        }
       }
-      
-      height[i] = elevation;
     }
     
     if (y % 50 === 0) {
-      setProgress(0.05 + (y / MAP_HEIGHT) * 0.25, `Continents: ${Math.floor(y / MAP_HEIGHT * 100)}%`);
+      setProgress(0.30 + (y / MAP_HEIGHT) * 0.15, `Tectonics: ${Math.floor(y / MAP_HEIGHT * 100)}%`);
       await sleep(0);
     }
   }
   
-  setProgress(0.30, 'Adjusting sea level...');
+  // STEP 4: Spread mountain ranges from boundaries
+  setProgress(0.45, 'Building mountain ranges...');
+  const mountainSpread = new Float32Array(height);
   
-  const sorted = new Float32Array(height).sort();
-  const seaLevel = sorted[Math.floor(sorted.length * 0.60)];
-  
-  for (let i = 0; i < height.length; i++) {
-    height[i] = (height[i] - seaLevel) * 2.8;
+  for (let pass = 0; pass < 12; pass++) {
+    for (let y = 1; y < MAP_HEIGHT - 1; y++) {
+      for (let x = 0; x < MAP_WIDTH; x++) {
+        const i = idx(x, y);
+        
+        if (boundaries[i] && boundaryType[i] === 1 && height[i] > 0.3) {
+          // Spread mountain influence to neighbors
+          const spread = height[i] * 0.18;
+          const decay = 0.85;
+          
+          const neighbors = [
+            idx((x - 1 + MAP_WIDTH) % MAP_WIDTH, y),
+            idx((x + 1) % MAP_WIDTH, y),
+            idx(x, y - 1),
+            idx(x, y + 1)
+          ];
+          
+          for (const ni of neighbors) {
+            if (height[ni] < height[i] && !boundaries[ni]) {
+              mountainSpread[ni] = Math.max(mountainSpread[ni], spread * decay);
+            }
+          }
+        }
+      }
+    }
+    
+    // Apply spread
+    for (let i = 0; i < height.length; i++) {
+      if (mountainSpread[i] > 0) {
+        height[i] += mountainSpread[i];
+        mountainSpread[i] *= 0.7;
+      }
+    }
+    
+    if (pass % 3 === 0) {
+      setProgress(0.45 + (pass / 12) * 0.10, `Mountain ranges: ${Math.floor(pass / 12 * 100)}%`);
+      await sleep(0);
+    }
   }
   
-  setProgress(0.35, 'Raising mountains (reduced density)...');
-
+  // STEP 5: Add hotspot volcanoes
+  setProgress(0.55, 'Placing volcanic islands...');
+  for (const hotspot of hotspots) {
+    for (let y = 0; y < MAP_HEIGHT; y++) {
+      for (let x = 0; x < MAP_WIDTH; x++) {
+        const i = idx(x, y);
+        
+        let dx = Math.abs(x - hotspot.x);
+        if (dx > MAP_WIDTH / 2) dx = MAP_WIDTH - dx;
+        const dy = y - hotspot.y;
+        
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const radius = 40;
+        
+        if (dist < radius) {
+          const influence = (1 - dist / radius) * hotspot.strength;
+          height[i] += influence * influence; // squared for sharper peaks
+        }
+      }
+    }
+  }
+  
+  // STEP 6: Add noise detail (for texture, not structure)
+  setProgress(0.60, 'Adding surface detail...');
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
       const i = idx(x, y);
       const nx = x / MAP_WIDTH;
       const ny = y / MAP_HEIGHT;
-
-      if (height[i] > 0.08) {
-        const continentalMask = Math.max(0, Math.min(1,
-          (noise.fbm(nx * 0.6 + 900, ny * 0.6 + 900, 2, 0.6, 2.0) + 1) * 0.5
-        ));
-
-        const mountainScale = 5;
-        let mountainNoise = noise.fbm(
-          nx * mountainScale + 300,
-          ny * mountainScale + 300,
-          4,
-          0.5,
-          2.2
-        );
-
-        mountainNoise = 1 - Math.abs(mountainNoise);
-        if (mountainNoise > 0.35) {
-          const peakFactor = Math.pow((mountainNoise - 0.35) / (1 - 0.35), 1.6);
-          const amplitude = 0.18;
-          height[i] += peakFactor * amplitude * continentalMask;
-        }
-      }
+      
+      // Fine detail noise
+      const detail = noise.fbm(
+        nx * 15 + 500,
+        ny * 15 + 500,
+        4,
+        0.5,
+        2.0
+      ) * 0.04;
+      
+      height[i] += detail;
     }
-
-  if (y % 60 === 0) {
-    setProgress(0.35 + (y / MAP_HEIGHT) * 0.15, `Mountains: ${Math.floor(y / MAP_HEIGHT * 100)}%`);
-    await sleep(0);
+    
+    if (y % 60 === 0) {
+      setProgress(0.60 + (y / MAP_HEIGHT) * 0.05, `Detail: ${Math.floor(y / MAP_HEIGHT * 100)}%`);
+      await sleep(0);
+    }
   }
-}
-
   
-  setProgress(0.50, 'Calculating temperature...');
+  // STEP 7: Adjust sea level
+  setProgress(0.65, 'Adjusting sea level...');
+  const sorted = new Float32Array(height).sort();
+  const seaLevel = sorted[Math.floor(sorted.length * 0.58)];
   
+  for (let i = 0; i < height.length; i++) {
+    height[i] = (height[i] - seaLevel) * 1.2;
+  }
+  
+  // STEP 8: Temperature
+  setProgress(0.70, 'Calculating temperature...');
   for (let y = 0; y < MAP_HEIGHT; y++) {
     const lat = Math.abs((y / MAP_HEIGHT) * 2 - 1);
     
@@ -336,13 +566,13 @@ async function generatePlanet() {
     }
     
     if (y % 60 === 0) {
-      setProgress(0.50 + (y / MAP_HEIGHT) * 0.10, `Temperature: ${Math.floor(y / MAP_HEIGHT * 100)}%`);
+      setProgress(0.70 + (y / MAP_HEIGHT) * 0.10, `Temperature: ${Math.floor(y / MAP_HEIGHT * 100)}%`);
       await sleep(0);
     }
   }
   
-  setProgress(0.60, 'Simulating climate...');
-  
+  // STEP 9: Climate/Moisture
+  setProgress(0.80, 'Simulating climate...');
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
       const i = idx(x, y);
@@ -371,18 +601,19 @@ async function generatePlanet() {
     }
     
     if (y % 60 === 0) {
-      setProgress(0.60 + (y / MAP_HEIGHT) * 0.15, `Climate: ${Math.floor(y / MAP_HEIGHT * 100)}%`);
+      setProgress(0.80 + (y / MAP_HEIGHT) * 0.10, `Climate: ${Math.floor(y / MAP_HEIGHT * 100)}%`);
       await sleep(0);
     }
   }
   
-  setProgress(0.80, 'Rendering planet...');
+  setProgress(0.90, 'Rendering planet...');
   await renderPlanetTexture(height, temperature, moisture);
   
-  planetData = { height, temperature, moisture, seed };
+  planetData = { height, temperature, moisture, seed, plates, plateMap, boundaries, boundaryType };
   
   const planetName = generatePlanetName(rng);
   document.getElementById('worldName').textContent = planetName;
+  document.getElementById('worldStats').textContent = `Tectonic Plates: ${plates.length}`;
   
   setProgress(1, 'Complete!');
   return planetData;
@@ -471,7 +702,7 @@ async function renderPlanetTexture(height, temperature, moisture) {
     }
     
     if (y % 100 === 0) {
-      setProgress(0.75 + (y / MAP_HEIGHT) * 0.14, `Rendering: ${Math.floor(y / MAP_HEIGHT * 100)}%`);
+      setProgress(0.90 + (y / MAP_HEIGHT) * 0.09, `Rendering: ${Math.floor(y / MAP_HEIGHT * 100)}%`);
       await sleep(0);
     }
   }
@@ -481,47 +712,6 @@ async function renderPlanetTexture(height, temperature, moisture) {
   basePlanetTexture = textureCanvas;
   
   mapCtx.drawImage(textureCanvas, 0, 0);
-}
-
-async function generateClouds(rng, noise) {
-  const cloudTextureCanvas = document.createElement('canvas');
-  cloudTextureCanvas.width = MAP_WIDTH;
-  cloudTextureCanvas.height = MAP_HEIGHT;
-  const cloudTextureCtx = cloudTextureCanvas.getContext('2d', { alpha: true });
-  
-  const imageData = cloudTextureCtx.createImageData(MAP_WIDTH, MAP_HEIGHT);
-  const data = imageData.data;
-  
-  for (let y = 0; y < MAP_HEIGHT; y++) {
-    for (let x = 0; x < MAP_WIDTH; x++) {
-      const i = y * MAP_WIDTH + x;
-      const pi = i * 4;
-      
-      const nx = x / MAP_WIDTH;
-      const ny = y / MAP_HEIGHT;
-      
-      const s = Math.sin(nx * Math.PI * 2);
-      const c = Math.cos(nx * Math.PI * 2);
-      
-      const cloudDensity = noise.fbm(c * 1.5 + 1000, s * 1.5 + 1000, ny * 8 + 2000, 4, 0.6, 2.1);
-      
-      const lat = Math.abs(ny * 2 - 1);
-      const cloudBoost = 1 - lat * 0.4;
-      
-      let alpha = (cloudDensity + 0.3) * cloudBoost;
-      alpha = Math.max(0, Math.min(0.6, alpha));
-      
-      data[pi] = 255;
-      data[pi + 1] = 255;
-      data[pi + 2] = 255;
-      data[pi + 3] = Math.floor(alpha * 180);
-    }
-  }
-  
-  cloudTextureCtx.putImageData(imageData, 0, 0);
-  
-  baseCloudTexture = cloudTextureCanvas;
-  cloudsCtx.drawImage(cloudTextureCanvas, 0, 0);
 }
 
 function renderCamera() {
@@ -546,50 +736,6 @@ function renderCamera() {
     camera.x, camera.y, viewWidth, viewHeight,
     0, 0, MAP_WIDTH, MAP_HEIGHT
   );
-}
-
-function renderClouds() {
-  if (!baseCloudTexture) return;
-  
-  const screenWidth = window.innerWidth;
-  const screenHeight = window.innerHeight;
-  
-  cloudsCtx.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
-  
-  const viewWidth = screenWidth / camera.zoom;
-  const viewHeight = screenHeight / camera.zoom;
-  
-  const wrappedCloudOffset = ((cloudOffset % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
-  const cloudX = (camera.x + wrappedCloudOffset) % MAP_WIDTH;
-  const sy = camera.y;
-  const sh = Math.min(viewHeight, MAP_HEIGHT - sy);
-  
-  cloudsCtx.globalAlpha = cloudOpacity;
-  
-  if (cloudX + viewWidth <= MAP_WIDTH) {
-    cloudsCtx.drawImage(
-      baseCloudTexture,
-      cloudX, sy, viewWidth, sh,
-      0, 0, MAP_WIDTH, MAP_HEIGHT
-    );
-  } else {
-    const firstPartWidth = MAP_WIDTH - cloudX;
-    const secondPartWidth = viewWidth - firstPartWidth;
-    
-    cloudsCtx.drawImage(
-      baseCloudTexture,
-      cloudX, sy, firstPartWidth, sh,
-      0, 0, MAP_WIDTH * (firstPartWidth / viewWidth), MAP_HEIGHT
-    );
-    
-    cloudsCtx.drawImage(
-      baseCloudTexture,
-      0, sy, secondPartWidth, sh,
-      MAP_WIDTH * (firstPartWidth / viewWidth), 0, MAP_WIDTH * (secondPartWidth / viewWidth), MAP_HEIGHT
-    );
-  }
-  
-  cloudsCtx.globalAlpha = 1.0;
 }
 
 mapCanvas.addEventListener('mousedown', (e) => {
