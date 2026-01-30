@@ -351,8 +351,8 @@ async function generatePlanet() {
   }
   
   // Smooth wrapping at edges (blend left and right edges)
-  setProgress(0.76, 'Smoothing edges for wrapping...');
-  await smoothEdgesForWrapping(height, moisture, temperature);
+  //setProgress(0.76, 'Smoothing edges for wrapping...');
+  //await smoothEdgesForWrapping(height, moisture, temperature);
   
   // STEP 6: Render to texture
   setProgress(0.80, 'Rendering planet...');
@@ -624,9 +624,9 @@ function renderCamera() {
   // Clamp Y (no vertical wrapping)
   const maxY = Math.max(0, MAP_HEIGHT - (screenHeight / camera.zoom));
   camera.y = Math.max(0, Math.min(maxY, camera.y));
-  
-  // X wraps infinitely
-  camera.x = ((camera.x % MAP_WIDTH) + MAP_WIDTH) % MAP_WIDTH;
+
+  const maxX = Math.max(0, MAP_WIDTH - (screenWidth / camera.zoom));
+  camera.x = Math.max(0, Math.min(maxX, camera.x));
   
   // Clear main canvas
   mapCtx.fillStyle = '#081420';
@@ -647,16 +647,6 @@ function renderCamera() {
     sx, sy, sw, sh,
     0, 0, sw * camera.zoom, sh * camera.zoom
   );
-  
-  // Handle horizontal wrapping
-  if (sx + viewWidth > MAP_WIDTH) {
-    const wrapWidth = (sx + viewWidth) - MAP_WIDTH;
-    mapCtx.drawImage(
-      basePlanetTexture,
-      0, sy, wrapWidth, sh,
-      sw * camera.zoom, 0, wrapWidth * camera.zoom, sh * camera.zoom
-    );
-  }
   
   // Render clouds if enabled
   if (showClouds) {
@@ -688,16 +678,6 @@ function renderClouds() {
     cloudX, sy, sw, sh,
     0, 0, sw * camera.zoom, sh * camera.zoom
   );
-  
-  // Handle wrapping
-  if (cloudX + viewWidth > MAP_WIDTH) {
-    const wrapWidth = (cloudX + viewWidth) - MAP_WIDTH;
-    cloudsCtx.drawImage(
-      baseCloudTexture,
-      0, sy, wrapWidth, sh,
-      sw * camera.zoom, 0, wrapWidth * camera.zoom, sh * camera.zoom
-    );
-  }
 }
 
 // ===== CAMERA CONTROLS =====
@@ -792,7 +772,7 @@ mapCanvas.style.cursor = 'grab';
 // ===== CLOUD ANIMATION =====
 function animateClouds() {
   cloudOffset += 0.15; // Slow drift
-  if (cloudOffset > MAP_WIDTH) cloudOffset = 0;
+  cloudOffset = Math.min (cloudOffset, MAP_WIDTH);
   
   if (planetData) {
     renderCamera();
