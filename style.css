@@ -308,6 +308,56 @@ html, body {
   font-size: 15px;
 }
 
+.setting-item-slider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+}
+
+.setting-item-slider span {
+  color: var(--text);
+  font-size: 15px;
+}
+
+.setting-item-slider input[type="range"] {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.1);
+  outline: none;
+  cursor: pointer;
+}
+
+.setting-item-slider input[type="range"]::-webkit-slider-thumb {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  box-shadow: 0 0 8px rgba(74, 158, 255, 0.5);
+}
+
+.setting-item-slider input[type="range"]::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent);
+  cursor: pointer;
+  border: none;
+  box-shadow: 0 0 8px rgba(74, 158, 255, 0.5);
+}
+
+.setting-item-slider span:last-child {
+  min-width: 35px;
+  text-align: right;
+  font-weight: 600;
+}
+
 .close-btn {
   width: 100%;
   padding: 12px;
