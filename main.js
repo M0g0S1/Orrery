@@ -274,36 +274,43 @@ async function generatePlanet() {
     height[i] = (height[i] - seaLevel) * 2.8;
   }
   
-  setProgress(0.35, 'Raising mountains...');
-  
+  setProgress(0.35, 'Raising mountains (reduced density)...');
+
   for (let y = 0; y < MAP_HEIGHT; y++) {
     for (let x = 0; x < MAP_WIDTH; x++) {
       const i = idx(x, y);
       const nx = x / MAP_WIDTH;
       const ny = y / MAP_HEIGHT;
-      
-      if (height[i] > 0.05) {
+
+      if (height[i] > 0.08) {
+        const continentalMask = Math.max(0, Math.min(1,
+          (noise.fbm(nx * 0.6 + 900, ny * 0.6 + 900, 2, 0.6, 2.0) + 1) * 0.5
+        ));
+
         const mountainScale = 5;
         let mountainNoise = noise.fbm(
-          nx * mountainScale + 300, 
-          ny * mountainScale + 300, 
-          4, 
-          0.5, 
+          nx * mountainScale + 300,
+          ny * mountainScale + 300,
+          4,
+          0.5,
           2.2
         );
-        
+
         mountainNoise = 1 - Math.abs(mountainNoise);
-        mountainNoise = Math.pow(mountainNoise, 2.5);
-        
-        height[i] += mountainNoise * 0.7;
+        if (mountainNoise > 0.35) {
+          const peakFactor = Math.pow((mountainNoise - 0.35) / (1 - 0.35), 1.6);
+          const amplitude = 0.18;
+          height[i] += peakFactor * amplitude * continentalMask;
+        }
       }
     }
-    
-    if (y % 60 === 0) {
-      setProgress(0.35 + (y / MAP_HEIGHT) * 0.15, `Mountains: ${Math.floor(y / MAP_HEIGHT * 100)}%`);
-      await sleep(0);
-    }
+
+  if (y % 60 === 0) {
+    setProgress(0.35 + (y / MAP_HEIGHT) * 0.15, `Mountains: ${Math.floor(y / MAP_HEIGHT * 100)}%`);
+    await sleep(0);
   }
+}
+
   
   setProgress(0.50, 'Calculating temperature...');
   
