@@ -35,6 +35,16 @@ function initCanvases() {
   cloudsCanvas.width = MAP_WIDTH;
   cloudsCanvas.height = MAP_HEIGHT;
   
+  const screenWidth = window.innerWidth;
+  const screenHeight = window.innerHeight;
+  const minZoomX = screenWidth / MAP_WIDTH;
+  const minZoomY = screenHeight / MAP_HEIGHT;
+  const minZoom = Math.max(minZoomX, minZoomY);
+  
+  camera.zoom = minZoom;
+  camera.targetZoom = minZoom;
+  camera.minZoom = minZoom;
+  
   resizeCanvases();
 }
 
@@ -46,6 +56,16 @@ function resizeCanvases() {
   mapCanvas.style.height = h + 'px';
   cloudsCanvas.style.width = w + 'px';
   cloudsCanvas.style.height = h + 'px';
+
+  const minZoomX = w / MAP_WIDTH;
+  const minZoomY = h / MAP_HEIGHT;
+  const minZoom = Math.max(minZoomX, minZoomY);
+  
+  camera.minZoom = minZoom;
+  if (camera.zoom < minZoom) {
+    camera.zoom = minZoom;
+    camera.targetZoom = minZoom;
+  }
 
   if (planetData) {
     renderCamera();
