@@ -517,7 +517,7 @@ async function renderPlanetTexture(height, temperature, moisture) {
   mapCtx.drawImage(textureCanvas, 0, 0);
 }
 
-// ===== GENERATE CLOUD LAYER (with smooth wrapping) =====
+// ===== GENERATE CLOUD LAYER =====
 async function generateClouds(rng, noise) {
   const cloudTextureCanvas = document.createElement('canvas');
   cloudTextureCanvas.width = MAP_WIDTH;
@@ -554,37 +554,6 @@ async function generateClouds(rng, noise) {
   }
   
   cloudTextureCtx.putImageData(imageData, 0, 0);
-  
-  // Blend edges for seamless wrapping
-  const blendWidth = 96;
-  const tempCanvas = document.createElement('canvas');
-  tempCanvas.width = MAP_WIDTH;
-  tempCanvas.height = MAP_HEIGHT;
-  const tempCtx = tempCanvas.getContext('2d', { alpha: true });
-  tempCtx.drawImage(cloudTextureCanvas, 0, 0);
-  
-  const tempData = tempCtx.getImageData(0, 0, MAP_WIDTH, MAP_HEIGHT);
-  const td = tempData.data;
-  
-  for (let y = 0; y < MAP_HEIGHT; y++) {
-    for (let x = 0; x < blendWidth; x++) {
-      const t = x / blendWidth;
-      const smoothT = t * t * (3 - 2 * t);
-      
-      const leftIdx = (y * MAP_WIDTH + x) * 4;
-      const rightIdx = (y * MAP_WIDTH + (MAP_WIDTH - blendWidth + x)) * 4;
-      
-      const leftA = td[leftIdx + 3];
-      const rightA = td[rightIdx + 3];
-      
-      const blendedA = leftA * (1 - smoothT) + rightA * smoothT;
-      
-      td[leftIdx + 3] = blendedA;
-      td[rightIdx + 3] = blendedA;
-    }
-  }
-  
-  cloudTextureCtx.putImageData(tempData, 0, 0);
   
   baseCloudTexture = cloudTextureCanvas;
   cloudsCtx.drawImage(cloudTextureCanvas, 0, 0);
@@ -771,10 +740,14 @@ mapCanvas.style.cursor = 'grab';
 
 // ===== CLOUD ANIMATION =====
 function animateClouds() {
-  cloudOffset += 0.15; // Slow drift
-  cloudOffset = Math.min (cloudOffset, MAP_WIDTH);
-  
-  if (planetData) {
+  cloudOffset += cloudSpeed;
+
+  if (cloudOffset > MAP_WIDTH + 200) {
+    cloudOffset = -200;
+    generateClouds(worldRng, worldNoise);
+  }
+
+    if (planetData) {
     renderCamera();
   }
   
