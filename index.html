@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <title>Planet History Simulator</title>
+  <title>Planet History Simulator - Orrery</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <link rel="stylesheet" href="style.css" />
 </head>
@@ -22,7 +22,6 @@
         <ellipse cx="300" cy="300" rx="170" ry="30" class="ring ring-2" />
       </g>
     </svg>
-
     <div class="menu-content">
       <h1 class="game-title">ORRERY</h1>
       <button id="playBtn" class="menu-btn">
@@ -46,7 +45,7 @@
       <div class="ui-top-left">
         <div class="info-box">
           <div class="world-name" id="worldName">Planet Kepler-442b</div>
-          <div class="world-stats" id="worldStats">Year 0 | Tribes: 0</div>
+          <div class="world-stats" id="worldStats">Year 0 | Tribes: 0 | Countries: 0</div>
         </div>
       </div>
       <div class="ui-top-right">
@@ -60,6 +59,19 @@
           <button class="time-btn" data-speed="3" title="Fast">▶▶▶</button>
           <button class="time-btn" data-speed="4" title="Ultra">▶▶▶▶</button>
         </div>
+      </div>
+      <div class="ui-bottom-right">
+        <div class="event-panel">
+          <div class="event-header">EVENTS</div>
+          <div id="eventLog" class="event-log"></div>
+        </div>
+      </div>
+      <div id="infoPanel" class="info-panel" style="display: none;">
+        <div class="info-panel-header">
+          <span id="infoPanelTitle">Information</span>
+          <button id="closeInfoPanel" class="close-info-btn">×</button>
+        </div>
+        <div id="infoPanelContent" class="info-panel-content"></div>
       </div>
     </div>
     <div id="settingsPanel" style="display: none;">
