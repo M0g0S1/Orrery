@@ -912,10 +912,8 @@ function simulateTick(tiles) {
   // Update UI
   updateGameUI();
   
-  // Render overlay every few ticks
-  if (gameState.year % 2 === 0) {
-    renderOverlay();
-  }
+  // Render overlay every tick
+  renderOverlay();
 }
 
 function migrateTribe(tribe, tiles) {
@@ -1434,6 +1432,9 @@ async function generatePlanet() {
   gameState.tribes = tribes;
   gameState.year = 0;
   
+  console.log(`Spawned ${tribes.length} tribes`);
+  console.log('Sample tribe:', tribes[0]);
+  
   setProgress(0.90, 'Rendering planet...');
   await renderPlanetTexture(height, temperature, moisture, rivers);
   
@@ -1612,18 +1613,17 @@ function renderOverlay() {
   
   // Draw tribe territories
   for (const tribe of gameState.tribes) {
-    if (tribe.settled) {
-      overlayCtx.fillStyle = tribe.color + '30';
-      
-      for (const terr of tribe.territories) {
-        const px = terr.x * pixelsPerTileX;
-        const py = terr.y * pixelsPerTileY;
-        overlayCtx.fillRect(px, py, pixelsPerTileX, pixelsPerTileY);
-      }
+    // Show ALL tribes, not just settled ones
+    overlayCtx.fillStyle = tribe.color + '30';
+    
+    for (const terr of tribe.territories) {
+      const px = terr.x * pixelsPerTileX;
+      const py = terr.y * pixelsPerTileY;
+      overlayCtx.fillRect(px, py, pixelsPerTileX, pixelsPerTileY);
     }
   }
   
-  // Draw borders
+  // Draw borders for countries
   overlayCtx.lineWidth = 2;
   
   for (const country of gameState.countries) {
@@ -1646,6 +1646,52 @@ function renderOverlay() {
         if (ny < 0 || ny >= TILE_HEIGHT) continue;
         
         const isOwn = country.territories.some(t => t.x === nx && t.y === ny);
+        
+        if (!isOwn) {
+          // Draw border
+          overlayCtx.beginPath();
+          if (n.dx === -1) {
+            overlayCtx.moveTo(px, py);
+            overlayCtx.lineTo(px, py + pixelsPerTileY);
+          } else if (n.dx === 1) {
+            overlayCtx.moveTo(px + pixelsPerTileX, py);
+            overlayCtx.lineTo(px + pixelsPerTileX, py + pixelsPerTileY);
+          } else if (n.dy === -1) {
+            overlayCtx.moveTo(px, py);
+            overlayCtx.lineTo(px + pixelsPerTileX, py);
+          } else if (n.dy === 1) {
+            overlayCtx.moveTo(px, py + pixelsPerTileY);
+            overlayCtx.lineTo(px + pixelsPerTileX, py + pixelsPerTileY);
+          }
+          overlayCtx.stroke();
+        }
+      }
+    }
+  }
+  
+  // Draw borders for tribes
+  overlayCtx.lineWidth = 1.5;
+  
+  for (const tribe of gameState.tribes) {
+    overlayCtx.strokeStyle = tribe.color + 'AA';
+    
+    for (const terr of tribe.territories) {
+      const px = terr.x * pixelsPerTileX;
+      const py = terr.y * pixelsPerTileY;
+      
+      // Check each edge
+      const neighbors = [
+        { dx: -1, dy: 0 }, { dx: 1, dy: 0 },
+        { dx: 0, dy: -1 }, { dx: 0, dy: 1 }
+      ];
+      
+      for (const n of neighbors) {
+        const nx = (terr.x + n.dx + TILE_WIDTH) % TILE_WIDTH;
+        const ny = terr.y + n.dy;
+        
+        if (ny < 0 || ny >= TILE_HEIGHT) continue;
+        
+        const isOwn = tribe.territories.some(t => t.x === nx && t.y === ny);
         
         if (!isOwn) {
           // Draw border
@@ -1697,7 +1743,7 @@ function renderOverlay() {
   
   // Draw tribe labels (smaller)
   for (const tribe of gameState.tribes) {
-    if (tribe.settled && tribe.territories.length > 0) {
+    if (tribe.territories.length > 0) {
       let sumX = 0, sumY = 0;
       for (const terr of tribe.territories) {
         sumX += terr.x;
