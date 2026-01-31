@@ -783,6 +783,36 @@ function spawnInitialTribes(tiles, rng) {
 // SIMULATION TICK
 // ============================================
 
+function getEraName(level) {
+  const eras = [
+    '',
+    'Stone Age',
+    'Early Agriculture',
+    'Bronze Age',
+    'Iron Age',
+    'Classical Era',
+    'Medieval Era',
+    'Early Modern Era',
+    'Industrial Era',
+    'Modern Era',
+    'Atomic / Information Era'
+  ];
+  return eras[level] || 'Unknown Era';
+}
+
+function getEraFromYear(year) {
+  if (year < -8000) return 1;     // Stone Age
+  if (year < -3000) return 2;     // Early Agriculture
+  if (year < -1200) return 3;     // Bronze Age
+  if (year < -500)  return 4;     // Iron Age
+  if (year < 500)   return 5;     // Classical
+  if (year < 1400)  return 6;     // Medieval
+  if (year < 1750)  return 7;     // Early Modern
+  if (year < 1900)  return 8;     // Industrial
+  if (year < 2000)  return 9;     // Modern
+  return 10;                      // Atomic / Info
+}
+
 function getTileAt(tiles, x, y) {
   const index = y * TILE_WIDTH + x;
   return tiles[index];
@@ -899,11 +929,30 @@ function simulateTick(tiles) {
     }
     country.population = totalPop;
     
-    // Tech progression
-    if (country.age % 50 === 0 && worldRng.next() < 0.4) {
+  // Tech progression (era-locked & synchronized)
+  const targetEra = getEraFromYear(gameState.year);
+
+  // Small variation so countries aren't identical
+  const eraOffset = Math.floor((worldRng.next() - 0.5) * 2); // -1, 0, +1
+  const desiredEra = Math.max(1, Math.min(10, targetEra + eraOffset));
+
+  // Slow, gated advancement
+  if (country.techLevel < desiredEra) {
+    // Very slow base chance — no free tech rushing
+    if (worldRng.next() < 0.015) {
       country.techLevel++;
-      logEvent('tech', `${country.name} advanced to tech level ${country.techLevel}.`);
+
+      logEvent(
+        'tech',
+        `${country.name} entered the ${getEraName(country.techLevel)}.`
+      );
     }
+  }
+
+  // Hard cap: no country can be far ahead of the world
+  if (country.techLevel > targetEra + 1) {
+    country.techLevel = targetEra + 1;
+  }
     
     // Leader death
     if (country.leader.age > 65 && worldRng.next() < 0.05) {
@@ -1741,51 +1790,83 @@ function renderOverlay() {
     }
   }
   
-  // Draw labels
-  overlayCtx.textAlign = 'center';
-  overlayCtx.textBaseline = 'middle';
-  overlayCtx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-  overlayCtx.shadowBlur = 6;
-  
-  // Draw country labels
-  for (const country of gameState.countries) {
-    if (country.territories.length === 0) continue;
-    
-    // Calculate center of country
-    let sumX = 0, sumY = 0;
-    for (const terr of country.territories) {
-      sumX += terr.x;
-      sumY += terr.y;
-    }
-    const centerX = (sumX / country.territories.length) * pixelsPerTileX + pixelsPerTileX / 2;
-    const centerY = (sumY / country.territories.length) * pixelsPerTileY + pixelsPerTileY / 2;
-    
-    // Font size based on territory size (scaled better)
-    const fontSize = Math.max(14, Math.min(48, country.territories.length * 2.5));
-    overlayCtx.font = `bold ${fontSize}px Arial`;
-    overlayCtx.fillStyle = '#ffffff';
-    
-    overlayCtx.fillText(country.name, centerX, centerY);
+// Draw labels
+overlayCtx.textAlign = 'center';
+overlayCtx.textBaseline = 'middle';
+overlayCtx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+overlayCtx.shadowBlur = 6;
+
+/* =========================
+   COUNTRY LABELS (SMART)
+   ========================= */
+for (const country of gameState.countries) {
+  const territoryCount = country.territories.length;
+  if (territoryCount < 4) continue; // too small → no label
+
+  // Compute centroid
+  let sumX = 0, sumY = 0;
+  for (const terr of country.territories) {
+    sumX += terr.x;
+    sumY += terr.y;
   }
-  
-  // Draw tribe labels - SHOW ALL TRIBES
-  for (const tribe of gameState.tribes) {
-    if (tribe.territories.length > 0) {
-      let sumX = 0, sumY = 0;
-      for (const terr of tribe.territories) {
-        sumX += terr.x;
-        sumY += terr.y;
-      }
-      const centerX = (sumX / tribe.territories.length) * pixelsPerTileX + pixelsPerTileX / 2;
-      const centerY = (sumY / tribe.territories.length) * pixelsPerTileY + pixelsPerTileY / 2;
-      
-      const fontSize = Math.max(10, Math.min(20, tribe.territories.length * 2));
-      overlayCtx.font = `${fontSize}px Arial`;
-      overlayCtx.fillStyle = '#eeeeee';
-      
-      overlayCtx.fillText(tribe.culture, centerX, centerY);
-    }
+
+  const centerX =
+    (sumX / territoryCount) * pixelsPerTileX + pixelsPerTileX / 2;
+  const centerY =
+    (sumY / territoryCount) * pixelsPerTileY + pixelsPerTileY / 2;
+
+  // Font size: grows slowly (sqrt)
+  const minFont = 10;
+  const maxFont = 26;
+  let fontSize = Math.floor(Math.sqrt(territoryCount) * 3);
+  fontSize = Math.max(minFont, Math.min(maxFont, fontSize));
+
+  overlayCtx.font = `bold ${fontSize}px Arial`;
+
+  // Measure text width
+  const textWidth = overlayCtx.measureText(country.name).width;
+
+  // Estimate how wide the country is allowed to be
+  const maxAllowedWidth =
+    Math.sqrt(territoryCount) * Math.min(pixelsPerTileX, pixelsPerTileY) * 1.4;
+
+  // If name won't fit → don't draw it
+  if (textWidth > maxAllowedWidth) continue;
+
+  overlayCtx.fillStyle = '#ffffff';
+  overlayCtx.fillText(country.name, centerX, centerY);
+}
+
+/* =========================
+   TRIBE LABELS (SMALLER)
+   ========================= */
+for (const tribe of gameState.tribes) {
+  const territoryCount = tribe.territories.length;
+  if (territoryCount === 0) continue;
+
+  let sumX = 0, sumY = 0;
+  for (const terr of tribe.territories) {
+    sumX += terr.x;
+    sumY += terr.y;
   }
+
+  const centerX =
+    (sumX / territoryCount) * pixelsPerTileX + pixelsPerTileX / 2;
+  const centerY =
+    (sumY / territoryCount) * pixelsPerTileY + pixelsPerTileY / 2;
+
+  const fontSize = Math.max(9, Math.min(16, territoryCount * 1.5));
+  overlayCtx.font = `${fontSize}px Arial`;
+
+  const textWidth = overlayCtx.measureText(tribe.culture).width;
+  const maxAllowedWidth =
+    Math.sqrt(territoryCount) * Math.min(pixelsPerTileX, pixelsPerTileY);
+
+  if (textWidth > maxAllowedWidth) continue;
+
+  overlayCtx.fillStyle = '#dddddd';
+  overlayCtx.fillText(tribe.culture, centerX, centerY);
+}
   
   overlayCtx.shadowBlur = 0;
   
