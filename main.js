@@ -1790,87 +1790,107 @@ function renderOverlay() {
     }
   }
   
-// Draw labels
+// ===== LABELS (HOI4-STYLE, ALWAYS VISIBLE) =====
+
+// reset text state to avoid color/shadow bugs
+overlayCtx.shadowBlur = 0;
+overlayCtx.shadowColor = 'transparent';
 overlayCtx.textAlign = 'center';
 overlayCtx.textBaseline = 'middle';
-overlayCtx.shadowColor = 'rgba(0, 0, 0, 0.9)';
-overlayCtx.shadowBlur = 6;
 
-/* =========================
-   COUNTRY LABELS (SMART)
-   ========================= */
-for (const country of gameState.countries) {
-  const territoryCount = country.territories.length;
-  if (territoryCount < 4) continue; // too small → no label
-
-  // Compute centroid
-  let sumX = 0, sumY = 0;
-  for (const terr of country.territories) {
-    sumX += terr.x;
-    sumY += terr.y;
+function pickInteriorTile(entity) {
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const t of entity.territories) {
+    minX = Math.min(minX, t.x);
+    maxX = Math.max(maxX, t.x);
+    minY = Math.min(minY, t.y);
+    maxY = Math.max(maxY, t.y);
   }
 
-  const centerX =
-    (sumX / territoryCount) * pixelsPerTileX + pixelsPerTileX / 2;
-  const centerY =
-    (sumY / territoryCount) * pixelsPerTileY + pixelsPerTileY / 2;
+  let best = entity.territories[0];
+  let bestScore = -Infinity;
 
-  // Font size: grows slowly (sqrt)
-  const minFont = 10;
-  const maxFont = 26;
-  let fontSize = Math.floor(Math.sqrt(territoryCount) * 3);
-  fontSize = Math.max(minFont, Math.min(maxFont, fontSize));
+  for (const t of entity.territories) {
+    const score = Math.min(
+      t.x - minX,
+      maxX - t.x,
+      t.y - minY,
+      maxY - t.y
+    );
+    if (score > bestScore) {
+      bestScore = score;
+      best = t;
+    }
+  }
+  return best;
+}
+
+function shortenToFit(ctx, text, maxWidth) {
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let cut = text.length;
+  while (cut > 1) {
+    const t = text.slice(0, cut) + '…';
+    if (ctx.measureText(t).width <= maxWidth) return t;
+    cut--;
+  }
+  return text[0];
+}
+
+// ---- COUNTRY LABELS ----
+for (const country of gameState.countries) {
+  if (!country.territories.length) continue;
+
+  const tile = pickInteriorTile(country);
+  const x = (tile.x + 0.5) * pixelsPerTileX;
+  const y = (tile.y + 0.5) * pixelsPerTileY;
+
+  const territoryCount = country.territories.length;
+
+  let fontSize = Math.max(8, Math.min(26, Math.sqrt(territoryCount) * 3));
+  const maxWidth = Math.min(pixelsPerTileX, pixelsPerTileY) * 1.6;
 
   overlayCtx.font = `bold ${fontSize}px Arial`;
 
-  // Measure text width
-  const textWidth = overlayCtx.measureText(country.name).width;
-
-  // Estimate how wide the country is allowed to be
-  const maxAllowedWidth =
-    Math.sqrt(territoryCount) * Math.min(pixelsPerTileX, pixelsPerTileY) * 1.4;
-
-  // If name won't fit → don't draw it
-  if (textWidth > maxAllowedWidth) continue;
-
-  overlayCtx.fillStyle = '#ffffff';
-  overlayCtx.fillText(country.name, centerX, centerY);
-}
-
-/* =========================
-   TRIBE LABELS (SMALLER)
-   ========================= */
-for (const tribe of gameState.tribes) {
-  const territoryCount = tribe.territories.length;
-  if (territoryCount === 0) continue;
-
-  let sumX = 0, sumY = 0;
-  for (const terr of tribe.territories) {
-    sumX += terr.x;
-    sumY += terr.y;
+  while (
+    overlayCtx.measureText(country.name).width > maxWidth &&
+    fontSize > 7
+  ) {
+    fontSize--;
+    overlayCtx.font = `bold ${fontSize}px Arial`;
   }
 
-  const centerX =
-    (sumX / territoryCount) * pixelsPerTileX + pixelsPerTileX / 2;
-  const centerY =
-    (sumY / territoryCount) * pixelsPerTileY + pixelsPerTileY / 2;
+  const label = shortenToFit(overlayCtx, country.name, maxWidth);
 
-  const fontSize = Math.max(9, Math.min(16, territoryCount * 1.5));
+  // clean readable text, no weird fills
+  overlayCtx.lineWidth = Math.max(1, fontSize * 0.15);
+  overlayCtx.strokeStyle = 'rgba(0,0,0,0.75)';
+  overlayCtx.fillStyle = '#ffffff';
+
+  overlayCtx.strokeText(label, x, y);
+  overlayCtx.fillText(label, x, y);
+}
+
+// ---- TRIBE LABELS ----
+for (const tribe of gameState.tribes) {
+  if (!tribe.territories.length) continue;
+
+  const tile = pickInteriorTile(tribe);
+  const x = (tile.x + 0.5) * pixelsPerTileX;
+  const y = (tile.y + 0.5) * pixelsPerTileY;
+
+  let fontSize = Math.max(7, Math.min(14, tribe.territories.length * 1.3));
+  const maxWidth = Math.min(pixelsPerTileX, pixelsPerTileY) * 1.3;
+
   overlayCtx.font = `${fontSize}px Arial`;
 
-  const textWidth = overlayCtx.measureText(tribe.culture).width;
-  const maxAllowedWidth =
-    Math.sqrt(territoryCount) * Math.min(pixelsPerTileX, pixelsPerTileY);
+  const label = shortenToFit(overlayCtx, tribe.culture, maxWidth);
 
-  if (textWidth > maxAllowedWidth) continue;
+  overlayCtx.lineWidth = Math.max(1, fontSize * 0.15);
+  overlayCtx.strokeStyle = 'rgba(0,0,0,0.7)';
+  overlayCtx.fillStyle = '#eeeeee';
 
-  overlayCtx.fillStyle = '#dddddd';
-  overlayCtx.fillText(tribe.culture, centerX, centerY);
-}
-  
-  overlayCtx.shadowBlur = 0;
-  
-  renderCamera();
+  overlayCtx.strokeText(label, x, y);
+  overlayCtx.fillText(label, x, y);
 }
 
 // Click to view info
