@@ -1719,7 +1719,69 @@ function renderOverlay() {
   renderCamera();
 }
 
-mapCanvas.addEventListener('mousedown', (e) => {
+// ============================================
+// KEYBOARD CAMERA CONTROLS
+// ============================================
+
+const keyState = {
+  w: false,
+  a: false,
+  s: false,
+  d: false,
+  ArrowUp: false,
+  ArrowLeft: false,
+  ArrowDown: false,
+  ArrowRight: false
+};
+
+const CAMERA_SPEED = 20; // pixels per frame when key is held
+
+window.addEventListener('keydown', (e) => {
+  const key = e.key.toLowerCase();
+  if (key in keyState || e.key in keyState) {
+    keyState[key] || (keyState[e.key] = true);
+    if (key === 'w' || key === 'a' || key === 's' || key === 'd' || 
+        e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'ArrowRight') {
+      e.preventDefault();
+    }
+  }
+});
+
+window.addEventListener('keyup', (e) => {
+  const key = e.key.toLowerCase();
+  if (key in keyState || e.key in keyState) {
+    keyState[key] = false;
+    keyState[e.key] = false;
+  }
+});
+
+function updateCameraFromKeys() {
+  if (keyState.w || keyState.ArrowUp) {
+    camera.y -= CAMERA_SPEED / camera.zoom;
+  }
+  if (keyState.s || keyState.ArrowDown) {
+    camera.y += CAMERA_SPEED / camera.zoom;
+  }
+  if (keyState.a || keyState.ArrowLeft) {
+    camera.x -= CAMERA_SPEED / camera.zoom;
+  }
+  if (keyState.d || keyState.ArrowRight) {
+    camera.x += CAMERA_SPEED / camera.zoom;
+  }
+  
+  // Clamp camera position
+  const screenWidth = window.innerWidth;
+  const screenHeight = window.innerHeight;
+  const viewWidth = screenWidth / camera.zoom;
+  const viewHeight = screenHeight / camera.zoom;
+  const maxX = Math.max(0, MAP_WIDTH - viewWidth);
+  const maxY = Math.max(0, MAP_HEIGHT - viewHeight);
+  
+  camera.x = Math.max(0, Math.min(maxX, camera.x));
+  camera.y = Math.max(0, Math.min(maxY, camera.y));
+}
+
+mapCanvas.addEventListener('click', (e) => {
   const rect = mapCanvas.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
   const mouseY = e.clientY - rect.top;
@@ -1768,14 +1830,6 @@ mapCanvas.addEventListener('mousedown', (e) => {
       return;
     }
   }
-  
-  // Normal drag behavior
-  camera.isDragging = true;
-  camera.dragStartX = e.clientX;
-  camera.dragStartY = e.clientY;
-  camera.dragStartCamX = camera.x;
-  camera.dragStartCamY = camera.y;
-  mapCanvas.style.cursor = 'grabbing';
 });
 
 function showTileInfo(tile) {
@@ -1865,62 +1919,7 @@ window.addEventListener('mousemove', (e) => {
   renderCamera();
 });
 
-window.addEventListener('mouseup', () => {
-  camera.isDragging = false;
-  mapCanvas.style.cursor = 'grab';
-});
-
-window.addEventListener('wheel', (e) => {
-  if (e.ctrlKey || e.metaKey) {
-    e.preventDefault();
-  }
-}, { passive: false });
-
-window.addEventListener('gesturestart', (e) => {
-  e.preventDefault();
-}, { passive: false });
-
-window.addEventListener('gesturechange', (e) => {
-  e.preventDefault();
-}, { passive: false });
-
-window.addEventListener('gestureend', (e) => {
-  e.preventDefault();
-}, { passive: false });
-
-mapCanvas.addEventListener('wheel', (e) => {
-  e.preventDefault();
-  
-  const rect = mapCanvas.getBoundingClientRect();
-  const mouseX = e.clientX - rect.left;
-  const mouseY = e.clientY - rect.top;
-  
-  const screenWidth = window.innerWidth;
-  const screenHeight = window.innerHeight;
-  
-  const minZoomX = screenWidth / MAP_WIDTH;
-  const minZoomY = screenHeight / MAP_HEIGHT;
-  const minZoom = Math.max(minZoomX, minZoomY);
-  
-  const worldX = camera.x + (mouseX / screenWidth) * (screenWidth / camera.zoom);
-  const worldY = camera.y + (mouseY / screenHeight) * (screenHeight / camera.zoom);
-  
-  const zoomSpeed = 0.1;
-  const delta = e.deltaY > 0 ? -zoomSpeed : zoomSpeed;
-  
-  const oldZoom = camera.zoom;
-  const newZoom = Math.max(minZoom, Math.min(camera.maxZoom, camera.zoom + delta));
-  
-  camera.targetZoom = newZoom;
-  camera.zoom = newZoom;
-  
-  camera.x = worldX - (mouseX / screenWidth) * (screenWidth / camera.zoom);
-  camera.y = worldY - (mouseY / screenHeight) * (screenHeight / camera.zoom);
-  
-  renderCamera();
-}, { passive: false });
-
-mapCanvas.style.cursor = 'grab';
+mapCanvas.style.cursor = 'pointer';
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -1939,6 +1938,8 @@ document.getElementById('playBtn').addEventListener('click', async () => {
     
     document.getElementById('gameUI').style.display = 'block';
     
+    // Initial render
+    renderOverlay();
     renderCamera();
     
     // Start simulation
@@ -1966,6 +1967,9 @@ function gameLoop() {
   const now = Date.now();
   const speed = SPEEDS[gameState.speed];
   
+  // Update camera from keyboard
+  updateCameraFromKeys();
+  
   if (speed > 0 && gameState.running) {
     const interval = 1000 / speed; // ms per tick
     
@@ -1974,6 +1978,9 @@ function gameLoop() {
       lastTickTime = now;
     }
   }
+  
+  // Render every frame for smooth camera movement
+  renderCamera();
   
   requestAnimationFrame(gameLoop);
 }
