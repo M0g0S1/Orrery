@@ -15,11 +15,19 @@ const camera = {
   targetZoom: 1.0,
   minZoom: 0.5,
   maxZoom: 4.0,
-  isDragging: false,
-  dragStartX: 0,
-  dragStartY: 0,
-  dragStartCamX: 0,
-  dragStartCamY: 0
+  moveSpeed: 20 // pixels per frame
+};
+
+// Keyboard state
+const keys = {
+  w: false,
+  a: false,
+  s: false,
+  d: false,
+  ArrowUp: false,
+  ArrowLeft: false,
+  ArrowDown: false,
+  ArrowRight: false
 };
 
 let planetData = null;
@@ -100,7 +108,7 @@ class Tribe {
     this.techLevel = 0; // primitive
     this.age = 0; // years existed
     this.settled = false;
-    this.settlementYears = 0; // years staying in same spot
+    this.settlementYears = 0; // years in same spot
     
     // Visualization
     this.color = generateColor(rng);
@@ -110,6 +118,9 @@ class Tribe {
     this.targetX = null;
     this.targetY = null;
     this.migrationCooldown = 0;
+    
+    // Leadership
+    this.leader = generateTribalLeader(rng);
   }
 }
 
@@ -142,99 +153,53 @@ class Leader {
 
 function generateColor(rng) {
   const hue = Math.floor(rng.next() * 360);
-  const sat = Math.floor(rng.range(40, 80));
-  const light = Math.floor(rng.range(35, 60));
+  const sat = Math.floor(rng.range(50, 85));
+  const light = Math.floor(rng.range(40, 65));
   return `hsl(${hue}, ${sat}%, ${light}%)`;
 }
 
 function generateLeader(rng) {
-  const firstNames = [
-    'Aldric', 'Bjorn', 'Casimir', 'Darius', 'Eamon', 'Falk', 'Gorin', 'Harald', 'Ivar', 'Joran',
-    'Kael', 'Leif', 'Magnus', 'Niko', 'Orin', 'Pavel', 'Ragnor', 'Sven', 'Thrain', 'Ulric',
-    'Viktor', 'Wulfric', 'Xerxes', 'Yorick', 'Zoran', 'Alaric', 'Baldur', 'Cedric', 'Draven', 'Erik',
-    'Fenris', 'Gunnar', 'Hector', 'Ingvar', 'Jarl', 'Konrad', 'Lothar', 'Markus', 'Nikolai', 'Oskar',
-    'Petrus', 'Quintus', 'Ragnar', 'Sigurd', 'Thorin', 'Ulfar', 'Varian', 'Wilhelm', 'Xander', 'Yuri',
-    'Zephyr', 'Aron', 'Boris', 'Cyrus', 'Dimitri', 'Erich', 'Friedrich', 'Gustav', 'Heinrich', 'Ivan',
-    'Julius', 'Karl', 'Leopold', 'Mikhail', 'Nikolas', 'Otto', 'Peter', 'Roland', 'Stefan', 'Theodor',
-    'Adira', 'Brenna', 'Celia', 'Diana', 'Elara', 'Freya', 'Giselle', 'Helena', 'Isolde', 'Josephine',
-    'Katerina', 'Lyanna', 'Mira', 'Natalia', 'Olga', 'Petra', 'Rowena', 'Selene', 'Tatiana', 'Ursula',
-    'Valeria', 'Winifred', 'Xiomara', 'Yvonne', 'Zara', 'Adriana', 'Beatrix', 'Cordelia', 'Delilah', 'Elysia'
-  ];
-  
-  const titles = [
-    'the Bold', 'the Wise', 'the Great', 'the Fierce', 'the Just', 'the Cunning', 'the Strong', 'the Fair',
-    'the Brave', 'the Terrible', 'the Magnificent', 'the Glorious', 'the Righteous', 'the Ruthless',
-    'the Merciful', 'the Conqueror', 'the Defender', 'the Liberator', 'the Unifier', 'the Lawgiver',
-    'the Pious', 'the Scholar', 'the Warrior', 'the Diplomat', 'the Builder', 'the Reformer',
-    'the Elder', 'the Younger', 'the First', 'the Second', 'the Third', 'the Last',
-    'the Red', 'the White', 'the Black', 'the Golden', 'the Silver', 'the Iron',
-    'the Silent', 'the Eloquent', 'the Swift', 'the Patient', 'the Vengeful', 'the Forgiving',
-    'Ironside', 'Bloodaxe', 'Dragonheart', 'Lionheart', 'Stormborn', 'Frostbeard',
-    'the Undying', 'the Eternal', 'the Faithful', 'the Apostate', 'the Martyr', 'the Saint'
-  ];
+  const firstNames = ['Aldric', 'Bjorn', 'Casimir', 'Darius', 'Eamon', 'Falk', 'Gorin', 'Harald', 'Ivar', 'Joran', 'Kael', 'Leif', 'Magnus', 'Niko', 'Orin', 'Pavel', 'Ragnor', 'Sven', 'Thrain', 'Ulric', 'Viktor', 'Wulfric', 'Xerxes', 'Yorick', 'Zoran'];
+  const titles = ['the Bold', 'the Wise', 'the Great', 'the Fierce', 'the Just', 'the Cunning', 'the Strong', 'the Fair'];
   
   const firstName = firstNames[Math.floor(rng.next() * firstNames.length)];
-  const title = rng.next() > 0.5 ? ' ' + titles[Math.floor(rng.next() * titles.length)] : '';
+  const title = rng.next() > 0.6 ? ' ' + titles[Math.floor(rng.next() * titles.length)] : '';
   
   const traits = {
     aggression: rng.next(),
     diplomacy: rng.next(),
     ambition: rng.next(),
-    caution: rng.next()
+    caution: rng.next(),
+    freedom: rng.next(),
+    rationality: rng.next()
   };
   
   return new Leader(firstName + title, traits);
 }
 
+function generateTribalLeader(rng) {
+  const tribalNames = ['Atok', 'Bram', 'Crag', 'Durn', 'Eron', 'Fenn', 'Grok', 'Hrok', 'Jarn', 'Korg', 'Loth', 'Murn', 'Norg', 'Olf', 'Rok', 'Skar', 'Thok', 'Ulf', 'Vorn', 'Wrek'];
+  const name = tribalNames[Math.floor(rng.next() * tribalNames.length)];
+  
+  // Generate personality with more variety
+  const traits = {
+    aggression: rng.next(),      // 0-1: peaceful to warlike
+    diplomacy: rng.next(),        // 0-1: hostile to friendly
+    ambition: rng.next(),         // 0-1: content to expansionist
+    caution: rng.next(),          // 0-1: reckless to cautious
+    freedom: rng.next(),          // 0-1: authoritarian to libertarian
+    rationality: rng.next()       // 0-1: emotional to logical
+  };
+  
+  return new Leader(name, traits);
+}
+
 function generateCultureName(rng) {
-  const prefixes = [
-    'Aka', 'Uru', 'Zul', 'Mor', 'Tek', 'Nal', 'Kra', 'Vec', 'Dro', 'Fen',
-    'Bal', 'Cor', 'Dan', 'Eld', 'Fyr', 'Gor', 'Hel', 'Ith', 'Jor', 'Kel',
-    'Lyr', 'Myr', 'Nor', 'Oth', 'Pyr', 'Qar', 'Rha', 'Syl', 'Tyr', 'Ulm',
-    'Val', 'Wyr', 'Xan', 'Yar', 'Zar', 'Ash', 'Bor', 'Cyr', 'Del', 'Eos',
-    'Fel', 'Gal', 'Hyr', 'Ira', 'Jyn', 'Kyn', 'Lor', 'Mek', 'Nar', 'Orl',
-    'Pra', 'Qel', 'Rin', 'Sol', 'Tor', 'Usk', 'Vex', 'Wol', 'Xer', 'Yul',
-    'Zan', 'Aer', 'Bry', 'Cae', 'Dor', 'Eryn', 'Fal', 'Gry', 'Hak', 'Ilm',
-    'Jal', 'Kor', 'Lun', 'Mal', 'Nev', 'Oth', 'Pel', 'Qor', 'Ral', 'Sar'
-  ];
-  const suffixes = [
-    'ni', 'ka', 'tu', 'ma', 'ri', 'lo', 'sa', 'nu', 'ta', 'ko',
-    'ra', 'la', 'na', 'da', 'va', 'ga', 'ha', 'ja', 'pa', 'za',
-    'th', 'sh', 'ch', 'kh', 'ph', 'rh', 'ss', 'tt', 'nn', 'mm',
-    'ar', 'er', 'or', 'ur', 'ir', 'an', 'en', 'on', 'un', 'in',
-    'os', 'us', 'is', 'as', 'es', 'ax', 'ex', 'ix', 'ox', 'ux',
-    'al', 'el', 'il', 'ol', 'ul', 'am', 'em', 'im', 'om', 'um',
-    'ia', 'ea', 'oa', 'ua', 'ya', 'ae', 'oe', 'ue', 'ye', 'ao'
-  ];
+  const prefixes = ['Aka', 'Uru', 'Zul', 'Mor', 'Tek', 'Nal', 'Kra', 'Vec', 'Dro', 'Fen'];
+  const suffixes = ['ni', 'ka', 'tu', 'ma', 'ri', 'lo', 'sa', 'nu', 'ta', 'ko'];
   const prefix = prefixes[Math.floor(rng.next() * prefixes.length)];
   const suffix = suffixes[Math.floor(rng.next() * suffixes.length)];
   return prefix + suffix;
-}
-
-function generateCountryName(culture, rng) {
-  const suffixes = [
-    'Kingdom', 'Empire', 'Dominion', 'Republic', 'Federation', 'Confederacy',
-    'Realm', 'Dynasty', 'Sovereignty', 'Commonwealth', 'League', 'Union',
-    'Principality', 'Khanate', 'Sultanate', 'Caliphate', 'Shogunate', 'Chiefdom',
-    'Confederation', 'Alliance', 'Coalition', 'Hegemony', 'State', 'Nation',
-    'Imperium', 'Regency', 'Protectorate', 'Territory', 'March', 'Duchy'
-  ];
-  
-  const prefixes = [
-    'United', 'Grand', 'Great', 'Holy', 'Sacred', 'Divine', 'Imperial',
-    'Royal', 'Noble', 'Ancient', 'Eternal', 'Supreme', 'Sovereign', 'Free',
-    'Democratic', 'New', 'Northern', 'Southern', 'Eastern', 'Western'
-  ];
-  
-  const usePrefix = rng.next() > 0.6;
-  const suffix = suffixes[Math.floor(rng.next() * suffixes.length)];
-  
-  if (usePrefix) {
-    const prefix = prefixes[Math.floor(rng.next() * prefixes.length)];
-    return `${prefix} ${culture} ${suffix}`;
-  }
-  
-  return `${culture} ${suffix}`;
 }
 
 const planetPrefixes = [
@@ -822,20 +787,22 @@ function simulateTick(tiles) {
         tribe.migrationCooldown--;
         tribe.settlementYears++;
         
-        // After 50 years in same spot, consider settling
-        if (tribe.settlementYears > 50 && currentTile.habitability > 0.5 && tribe.population > 150) {
+        // After 20-40 years in same spot (reduced from 50), consider settling
+        const settlementThreshold = 20 + (tribe.leader.traits.caution * 20); // 20-40 years based on caution
+        
+        if (tribe.settlementYears > settlementThreshold && currentTile.habitability > 0.4 && tribe.population > 100) {
           tribe.settled = true;
           
           // Tech advancement from settling
           tribe.techLevel = 1; // Agriculture discovered
           
-          // Chance to form proto-state
-          if (worldRng.next() < 0.3) {
-            formProtoState(tribe, tiles);
+          logEvent('settlement', `${tribe.culture} tribe has settled under ${tribe.leader.name}.`);
+          
+          // Ambitious leaders more likely to form proto-states
+          if (tribe.leader.traits.ambition > 0.7 && worldRng.next() < 0.4) {
+            formCivilization(tribe, tiles);
             gameState.tribes.splice(i, 1);
             continue;
-          } else {
-            logEvent('settlement', `${tribe.culture} tribe has settled.`);
           }
         }
       } else {
@@ -843,16 +810,28 @@ function simulateTick(tiles) {
         migrateTribe(tribe, tiles);
       }
     } else {
-      // Settled tribes can expand territory
-      if (tribe.age % 10 === 0 && tribe.population > 200) {
-        expandTerritory(tribe, tiles, 'tribe');
+      // Settled tribes can expand territory based on population and resources
+      if (tribe.age % 5 === 0 && tribe.population > 150) {
+        const tile = getTileAt(tiles, tribe.x, tribe.y);
+        
+        // Calculate expansion chance based on resources and population
+        const resourceScore = (tile.foodPotential + tile.wood + tile.fertility) / 3;
+        const populationScore = Math.min(1, tribe.population / 500);
+        const expansionChance = (resourceScore * 0.5 + populationScore * 0.3 + tribe.leader.traits.ambition * 0.2);
+        
+        if (worldRng.next() < expansionChance) {
+          expandTerritory(tribe, tiles, 'tribe');
+        }
       }
       
-      // Settled tribes might form countries
-      if (tribe.territories.length > 3 && tribe.population > 300 && worldRng.next() < 0.05) {
-        formProtoState(tribe, tiles);
-        gameState.tribes.splice(i, 1);
-        continue;
+      // Settled tribes might form countries (less often, more criteria)
+      if (tribe.territories.length > 5 && tribe.population > 400 && tribe.age > 50) {
+        const formationChance = tribe.leader.traits.ambition * 0.03;
+        if (worldRng.next() < formationChance) {
+          formCivilization(tribe, tiles);
+          gameState.tribes.splice(i, 1);
+          continue;
+        }
       }
     }
     
@@ -912,7 +891,7 @@ function simulateTick(tiles) {
   // Update UI
   updateGameUI();
   
-  // Render overlay every tick
+  // Render overlay every tick for smooth visualization
   renderOverlay();
 }
 
@@ -935,6 +914,13 @@ function migrateTribe(tribe, tiles) {
       const tile = getTileAt(tiles, nx, ny);
       
       if (!tile.isLand) continue;
+      
+      // Check if already occupied by another tribe
+      const isOccupied = gameState.tribes.some(t => 
+        t.id !== tribe.id && t.territories.some(terr => terr.x === nx && terr.y === ny)
+      );
+      
+      if (isOccupied) continue; // Can't spawn in occupied territory
       
       // Score this tile
       let score = tile.habitability * 100;
@@ -962,26 +948,42 @@ function migrateTribe(tribe, tiles) {
   // Sort by score
   neighbors.sort((a, b) => b.score - a.score);
   
-  // Pick from top choices with some randomness
-  const choice = neighbors[Math.floor(worldRng.next() * Math.min(3, neighbors.length))];
+  // Leader personality affects choice
+  let choice;
+  
+  // REALLY TINY chance (2%) of making a terrible decision (low rationality leaders)
+  if (tribe.leader.traits.rationality < 0.3 && worldRng.next() < 0.02) {
+    // Pick one of the WORST options 😂
+    const worstIndex = Math.max(0, neighbors.length - 1 - Math.floor(worldRng.next() * 3));
+    choice = neighbors[worstIndex];
+    
+    if (worldRng.next() < 0.3) {
+      logEvent('migration', `${tribe.culture} tribe made a questionable decision under ${tribe.leader.name}...`);
+    }
+  } else {
+    // Normal behavior: pick from top choices with some randomness
+    const rationality = tribe.leader.traits.rationality;
+    const topChoices = Math.max(1, Math.floor((1 - rationality) * 5) + 1); // Less rational = more random
+    choice = neighbors[Math.floor(worldRng.next() * Math.min(topChoices, neighbors.length))];
+  }
   
   // Move tribe
   tribe.x = choice.x;
   tribe.y = choice.y;
   tribe.territories = [{ x: choice.x, y: choice.y }];
-  tribe.migrationCooldown = Math.floor(worldRng.range(10, 30)); // Stay for a while
+  tribe.migrationCooldown = Math.floor(worldRng.range(15, 35)); // Stay for a while (reduced from 10-30)
   tribe.settlementYears = 0;
   
-  if (worldRng.next() < 0.1) {
+  if (worldRng.next() < 0.05) {
     logEvent('migration', `${tribe.culture} tribe migrated to new lands.`);
   }
 }
 
-function formProtoState(tribe, tiles) {
-  const countryName = generateCountryName(tribe.culture, worldRng);
+function formCivilization(tribe, tiles) {
+  const civName = tribe.culture + ' Civilization';
   const country = new Country(
-    gameState.countries.length,
-    countryName,
+    Date.now() + Math.random(), // Unique ID
+    civName,
     tribe.x,
     tribe.y,
     tribe.color,
@@ -991,18 +993,14 @@ function formProtoState(tribe, tiles) {
   country.population = tribe.population;
   country.territories = [...tribe.territories];
   country.techLevel = tribe.techLevel;
-  country.government = 'chiefdom';
+  country.government = 'tribal_confederation';
+  country.leader = tribe.leader; // Transfer the leader
   
   gameState.countries.push(country);
-  logEvent('country_formed', `${countryName} has been founded!`);
+  logEvent('civilization', `${civName} has formed under ${tribe.leader.name}!`);
 }
 
 function expandTerritory(entity, tiles, entityType) {
-  // Tribes can only expand to max 5 tiles (small tribal territories)
-  if (entityType === 'tribe' && entity.territories.length >= 5) {
-    return;
-  }
-  
   // Find neighboring unclaimed tiles
   const newTerritories = [];
   
@@ -1019,33 +1017,20 @@ function expandTerritory(entity, tiles, entityType) {
       
       if (!tile.isLand) continue;
       
-      // Check if already claimed by this entity
-      const alreadyOwned = entity.territories.some(t => t.x === n.x && t.y === n.y);
-      if (alreadyOwned) continue;
+      // Check if already claimed
+      const alreadyClaimed = entity.territories.some(t => t.x === n.x && t.y === n.y);
+      if (alreadyClaimed) continue;
       
-      // CRITICAL: Check if claimed by ANY other entity
+      // Check if claimed by another entity
       let claimedByOther = false;
-      
-      // Check all countries
-      for (const country of gameState.countries) {
-        if (country.id !== entity.id || entityType !== 'country') {
-          if (country.territories.some(t => t.x === n.x && t.y === n.y)) {
-            claimedByOther = true;
-            break;
-          }
-        }
-      }
-      
-      // Check all tribes
-      if (!claimedByOther) {
-        for (const tribe of gameState.tribes) {
-          if (tribe.id !== entity.id || entityType !== 'tribe') {
-            if (tribe.territories.some(t => t.x === n.x && t.y === n.y)) {
-              claimedByOther = true;
-              break;
-            }
-          }
-        }
+      if (entityType === 'country') {
+        claimedByOther = gameState.countries.some(c => 
+          c.id !== entity.id && c.territories.some(t => t.x === n.x && t.y === n.y)
+        );
+      } else {
+        claimedByOther = gameState.tribes.some(tr => 
+          tr.id !== entity.id && tr.territories.some(t => t.x === n.x && t.y === n.y)
+        );
       }
       
       if (claimedByOther) continue;
@@ -1065,35 +1050,14 @@ function tribalConflict(tribe, tiles) {
   for (const otherTribe of gameState.tribes) {
     if (otherTribe.id === tribe.id) continue;
     
-    // Check if territories are adjacent
-    let areAdjacent = false;
-    for (const terr of tribe.territories) {
-      for (const otherTerr of otherTribe.territories) {
-        const dx = Math.abs(terr.x - otherTerr.x);
-        const dy = Math.abs(terr.y - otherTerr.y);
-        
-        // Adjacent if exactly 1 tile away (not diagonal)
-        if ((dx === 1 && dy === 0) || (dx === 0 && dy === 1)) {
-          areAdjacent = true;
-          break;
-        }
-      }
-      if (areAdjacent) break;
-    }
+    const dist = Math.abs(tribe.x - otherTribe.x) + Math.abs(tribe.y - otherTribe.y);
     
-    if (areAdjacent && otherTribe.settled) {
+    if (dist <= 2 && otherTribe.settled) {
       // Conflict!
       if (tribe.population > otherTribe.population * 1.3) {
         // Tribe conquers other tribe
         tribe.population += Math.floor(otherTribe.population * 0.5);
-        
-        // Take all territories
-        for (const terr of otherTribe.territories) {
-          // Only add if not already owned
-          if (!tribe.territories.some(t => t.x === terr.x && t.y === terr.y)) {
-            tribe.territories.push(terr);
-          }
-        }
+        tribe.territories.push(...otherTribe.territories);
         
         logEvent('conquest', `${tribe.culture} tribe conquered ${otherTribe.culture} tribe.`);
         
@@ -1161,16 +1125,8 @@ function resolveWar(attacker, defender, tiles) {
   if (attackerStrength > defenderStrength * 1.3) {
     // Attacker wins - takes some territory
     const taken = Math.floor(defender.territories.length * 0.3);
-    
-    // Take territories from defender
     const takenTerr = defender.territories.splice(0, taken);
-    
-    // Only add territories that aren't already owned by attacker
-    for (const terr of takenTerr) {
-      if (!attacker.territories.some(t => t.x === terr.x && t.y === terr.y)) {
-        attacker.territories.push(terr);
-      }
-    }
+    attacker.territories.push(...takenTerr);
     
     logEvent('war_end', `${attacker.name} victorious over ${defender.name}!`);
     
@@ -1186,11 +1142,14 @@ function resolveWar(attacker, defender, tiles) {
 }
 
 function splitTribe(tribe, tiles) {
+  // Limit total number of tribes
+  if (gameState.tribes.length >= 600) return;
+  
   const newPopulation = Math.floor(tribe.population * 0.4);
   tribe.population -= newPopulation;
   
   const newTribe = new Tribe(
-    gameState.tribes.length,
+    Date.now() + Math.random(), // Use unique ID
     tribe.x,
     tribe.y,
     newPopulation,
@@ -1445,6 +1404,10 @@ async function generatePlanet() {
   updateGameUI();
   
   setProgress(1, 'Complete!');
+  
+  // Render initial overlay to show tribes immediately
+  renderOverlay();
+  
   return planetData;
 }
 
@@ -1600,9 +1563,9 @@ function renderOverlay() {
   const pixelsPerTileX = MAP_WIDTH / TILE_WIDTH;
   const pixelsPerTileY = MAP_HEIGHT / TILE_HEIGHT;
   
-  // Draw country territories
+  // Draw country territories with fill
   for (const country of gameState.countries) {
-    overlayCtx.fillStyle = country.color + '40'; // Semi-transparent
+    overlayCtx.fillStyle = country.color + '55'; // More visible semi-transparent
     
     for (const terr of country.territories) {
       const px = terr.x * pixelsPerTileX;
@@ -1611,23 +1574,24 @@ function renderOverlay() {
     }
   }
   
-  // Draw tribe territories
+  // Draw tribe territories with fill - SHOW ALL TRIBES (not just settled)
   for (const tribe of gameState.tribes) {
-    // Show ALL tribes, not just settled ones
-    overlayCtx.fillStyle = tribe.color + '30';
-    
-    for (const terr of tribe.territories) {
-      const px = terr.x * pixelsPerTileX;
-      const py = terr.y * pixelsPerTileY;
-      overlayCtx.fillRect(px, py, pixelsPerTileX, pixelsPerTileY);
+    if (tribe.territories.length > 0) {
+      overlayCtx.fillStyle = tribe.color + '60'; // Visible semi-transparent
+      
+      for (const terr of tribe.territories) {
+        const px = terr.x * pixelsPerTileX;
+        const py = terr.y * pixelsPerTileY;
+        overlayCtx.fillRect(px, py, pixelsPerTileX, pixelsPerTileY);
+      }
     }
   }
   
-  // Draw borders for countries
-  overlayCtx.lineWidth = 2;
+  // Draw country borders (thicker and more visible)
+  overlayCtx.lineWidth = 3;
   
   for (const country of gameState.countries) {
-    overlayCtx.strokeStyle = country.color + 'CC';
+    overlayCtx.strokeStyle = country.color;
     
     for (const terr of country.territories) {
       const px = terr.x * pixelsPerTileX;
@@ -1669,47 +1633,47 @@ function renderOverlay() {
     }
   }
   
-  // Draw borders for tribes
-  overlayCtx.lineWidth = 1.5;
+  // Draw tribe borders (slightly thinner)
+  overlayCtx.lineWidth = 2;
   
   for (const tribe of gameState.tribes) {
-    overlayCtx.strokeStyle = tribe.color + 'AA';
-    
-    for (const terr of tribe.territories) {
-      const px = terr.x * pixelsPerTileX;
-      const py = terr.y * pixelsPerTileY;
+    if (tribe.settled && tribe.territories.length > 0) {
+      overlayCtx.strokeStyle = tribe.color;
       
-      // Check each edge
-      const neighbors = [
-        { dx: -1, dy: 0 }, { dx: 1, dy: 0 },
-        { dx: 0, dy: -1 }, { dx: 0, dy: 1 }
-      ];
-      
-      for (const n of neighbors) {
-        const nx = (terr.x + n.dx + TILE_WIDTH) % TILE_WIDTH;
-        const ny = terr.y + n.dy;
+      for (const terr of tribe.territories) {
+        const px = terr.x * pixelsPerTileX;
+        const py = terr.y * pixelsPerTileY;
         
-        if (ny < 0 || ny >= TILE_HEIGHT) continue;
+        const neighbors = [
+          { dx: -1, dy: 0 }, { dx: 1, dy: 0 },
+          { dx: 0, dy: -1 }, { dx: 0, dy: 1 }
+        ];
         
-        const isOwn = tribe.territories.some(t => t.x === nx && t.y === ny);
-        
-        if (!isOwn) {
-          // Draw border
-          overlayCtx.beginPath();
-          if (n.dx === -1) {
-            overlayCtx.moveTo(px, py);
-            overlayCtx.lineTo(px, py + pixelsPerTileY);
-          } else if (n.dx === 1) {
-            overlayCtx.moveTo(px + pixelsPerTileX, py);
-            overlayCtx.lineTo(px + pixelsPerTileX, py + pixelsPerTileY);
-          } else if (n.dy === -1) {
-            overlayCtx.moveTo(px, py);
-            overlayCtx.lineTo(px + pixelsPerTileX, py);
-          } else if (n.dy === 1) {
-            overlayCtx.moveTo(px, py + pixelsPerTileY);
-            overlayCtx.lineTo(px + pixelsPerTileX, py + pixelsPerTileY);
+        for (const n of neighbors) {
+          const nx = (terr.x + n.dx + TILE_WIDTH) % TILE_WIDTH;
+          const ny = terr.y + n.dy;
+          
+          if (ny < 0 || ny >= TILE_HEIGHT) continue;
+          
+          const isOwn = tribe.territories.some(t => t.x === nx && t.y === ny);
+          
+          if (!isOwn) {
+            overlayCtx.beginPath();
+            if (n.dx === -1) {
+              overlayCtx.moveTo(px, py);
+              overlayCtx.lineTo(px, py + pixelsPerTileY);
+            } else if (n.dx === 1) {
+              overlayCtx.moveTo(px + pixelsPerTileX, py);
+              overlayCtx.lineTo(px + pixelsPerTileX, py + pixelsPerTileY);
+            } else if (n.dy === -1) {
+              overlayCtx.moveTo(px, py);
+              overlayCtx.lineTo(px + pixelsPerTileX, py);
+            } else if (n.dy === 1) {
+              overlayCtx.moveTo(px, py + pixelsPerTileY);
+              overlayCtx.lineTo(px + pixelsPerTileX, py + pixelsPerTileY);
+            }
+            overlayCtx.stroke();
           }
-          overlayCtx.stroke();
         }
       }
     }
@@ -1718,9 +1682,10 @@ function renderOverlay() {
   // Draw labels
   overlayCtx.textAlign = 'center';
   overlayCtx.textBaseline = 'middle';
-  overlayCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-  overlayCtx.shadowBlur = 4;
+  overlayCtx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+  overlayCtx.shadowBlur = 6;
   
+  // Draw country labels
   for (const country of gameState.countries) {
     if (country.territories.length === 0) continue;
     
@@ -1730,18 +1695,18 @@ function renderOverlay() {
       sumX += terr.x;
       sumY += terr.y;
     }
-    const centerX = (sumX / country.territories.length) * pixelsPerTileX;
-    const centerY = (sumY / country.territories.length) * pixelsPerTileY;
+    const centerX = (sumX / country.territories.length) * pixelsPerTileX + pixelsPerTileX / 2;
+    const centerY = (sumY / country.territories.length) * pixelsPerTileY + pixelsPerTileY / 2;
     
-    // Font size based on territory size
-    const fontSize = Math.max(12, Math.min(40, country.territories.length * 2));
+    // Font size based on territory size (scaled better)
+    const fontSize = Math.max(14, Math.min(48, country.territories.length * 2.5));
     overlayCtx.font = `bold ${fontSize}px Arial`;
     overlayCtx.fillStyle = '#ffffff';
     
     overlayCtx.fillText(country.name, centerX, centerY);
   }
   
-  // Draw tribe labels (smaller)
+  // Draw tribe labels - SHOW ALL TRIBES
   for (const tribe of gameState.tribes) {
     if (tribe.territories.length > 0) {
       let sumX = 0, sumY = 0;
@@ -1749,10 +1714,10 @@ function renderOverlay() {
         sumX += terr.x;
         sumY += terr.y;
       }
-      const centerX = (sumX / tribe.territories.length) * pixelsPerTileX;
-      const centerY = (sumY / tribe.territories.length) * pixelsPerTileY;
+      const centerX = (sumX / tribe.territories.length) * pixelsPerTileX + pixelsPerTileX / 2;
+      const centerY = (sumY / tribe.territories.length) * pixelsPerTileY + pixelsPerTileY / 2;
       
-      const fontSize = Math.max(8, Math.min(16, tribe.territories.length * 1.5));
+      const fontSize = Math.max(10, Math.min(20, tribe.territories.length * 2));
       overlayCtx.font = `${fontSize}px Arial`;
       overlayCtx.fillStyle = '#eeeeee';
       
@@ -1765,68 +1730,7 @@ function renderOverlay() {
   renderCamera();
 }
 
-// ============================================
-// KEYBOARD CAMERA CONTROLS
-// ============================================
-
-const keyState = {
-  w: false,
-  a: false,
-  s: false,
-  d: false,
-  ArrowUp: false,
-  ArrowLeft: false,
-  ArrowDown: false,
-  ArrowRight: false
-};
-
-const CAMERA_SPEED = 20; // pixels per frame when key is held
-
-window.addEventListener('keydown', (e) => {
-  const key = e.key.toLowerCase();
-  if (key in keyState || e.key in keyState) {
-    keyState[key] || (keyState[e.key] = true);
-    if (key === 'w' || key === 'a' || key === 's' || key === 'd' || 
-        e.key === 'ArrowUp' || e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'ArrowRight') {
-      e.preventDefault();
-    }
-  }
-});
-
-window.addEventListener('keyup', (e) => {
-  const key = e.key.toLowerCase();
-  if (key in keyState || e.key in keyState) {
-    keyState[key] = false;
-    keyState[e.key] = false;
-  }
-});
-
-function updateCameraFromKeys() {
-  if (keyState.w || keyState.ArrowUp) {
-    camera.y -= CAMERA_SPEED / camera.zoom;
-  }
-  if (keyState.s || keyState.ArrowDown) {
-    camera.y += CAMERA_SPEED / camera.zoom;
-  }
-  if (keyState.a || keyState.ArrowLeft) {
-    camera.x -= CAMERA_SPEED / camera.zoom;
-  }
-  if (keyState.d || keyState.ArrowRight) {
-    camera.x += CAMERA_SPEED / camera.zoom;
-  }
-  
-  // Clamp camera position
-  const screenWidth = window.innerWidth;
-  const screenHeight = window.innerHeight;
-  const viewWidth = screenWidth / camera.zoom;
-  const viewHeight = screenHeight / camera.zoom;
-  const maxX = Math.max(0, MAP_WIDTH - viewWidth);
-  const maxY = Math.max(0, MAP_HEIGHT - viewHeight);
-  
-  camera.x = Math.max(0, Math.min(maxX, camera.x));
-  camera.y = Math.max(0, Math.min(maxY, camera.y));
-}
-
+// Click to view info
 mapCanvas.addEventListener('click', (e) => {
   const rect = mapCanvas.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
@@ -1910,12 +1814,20 @@ function showTribeInfo(tribe) {
   title.textContent = `${tribe.culture} Tribe`;
   
   content.innerHTML = `
+    <div class="info-row"><span class="info-label">Leader:</span><span class="info-value">${tribe.leader.name}</span></div>
     <div class="info-row"><span class="info-label">Population:</span><span class="info-value">${tribe.population}</span></div>
     <div class="info-row"><span class="info-label">Age:</span><span class="info-value">${tribe.age} years</span></div>
     <div class="info-row"><span class="info-label">Tech Level:</span><span class="info-value">${tribe.techLevel}</span></div>
     <div class="info-row"><span class="info-label">Status:</span><span class="info-value">${tribe.settled ? 'Settled' : 'Nomadic'}</span></div>
     <div class="info-row"><span class="info-label">Territories:</span><span class="info-value">${tribe.territories.length}</span></div>
     <div class="info-row"><span class="info-label">Location:</span><span class="info-value">(${tribe.x}, ${tribe.y})</span></div>
+    <h4 style="color: var(--accent); margin-top: 12px; margin-bottom: 6px;">Leader Traits</h4>
+    <div class="info-row"><span class="info-label">Aggression:</span><span class="info-value">${(tribe.leader.traits.aggression * 100).toFixed(0)}%</span></div>
+    <div class="info-row"><span class="info-label">Diplomacy:</span><span class="info-value">${(tribe.leader.traits.diplomacy * 100).toFixed(0)}%</span></div>
+    <div class="info-row"><span class="info-label">Ambition:</span><span class="info-value">${(tribe.leader.traits.ambition * 100).toFixed(0)}%</span></div>
+    <div class="info-row"><span class="info-label">Caution:</span><span class="info-value">${(tribe.leader.traits.caution * 100).toFixed(0)}%</span></div>
+    <div class="info-row"><span class="info-label">Freedom:</span><span class="info-value">${(tribe.leader.traits.freedom * 100).toFixed(0)}%</span></div>
+    <div class="info-row"><span class="info-label">Rationality:</span><span class="info-value">${(tribe.leader.traits.rationality * 100).toFixed(0)}%</span></div>
   `;
   
   panel.style.display = 'block';
@@ -1944,6 +1856,8 @@ function showCountryInfo(country) {
     <div class="info-row"><span class="info-label">Diplomacy:</span><span class="info-value">${(country.leader.traits.diplomacy * 100).toFixed(0)}%</span></div>
     <div class="info-row"><span class="info-label">Ambition:</span><span class="info-value">${(country.leader.traits.ambition * 100).toFixed(0)}%</span></div>
     <div class="info-row"><span class="info-label">Caution:</span><span class="info-value">${(country.leader.traits.caution * 100).toFixed(0)}%</span></div>
+    <div class="info-row"><span class="info-label">Freedom:</span><span class="info-value">${((country.leader.traits.freedom || 0.5) * 100).toFixed(0)}%</span></div>
+    <div class="info-row"><span class="info-label">Rationality:</span><span class="info-value">${((country.leader.traits.rationality || 0.5) * 100).toFixed(0)}%</span></div>
   `;
   
   panel.style.display = 'block';
@@ -1953,19 +1867,98 @@ document.getElementById('closeInfoPanel').addEventListener('click', () => {
   document.getElementById('infoPanel').style.display = 'none';
 });
 
-window.addEventListener('mousemove', (e) => {
-  if (!camera.isDragging) return;
-  
-  const dx = e.clientX - camera.dragStartX;
-  const dy = e.clientY - camera.dragStartY;
-  
-  camera.x = camera.dragStartCamX - dx / camera.zoom;
-  camera.y = camera.dragStartCamY - dy / camera.zoom;
-  
-  renderCamera();
+// Keyboard controls for camera movement
+window.addEventListener('keydown', (e) => {
+  if (e.key in keys || e.key === 'w' || e.key === 'a' || e.key === 's' || e.key === 'd') {
+    keys[e.key] = true;
+    e.preventDefault();
+  }
 });
 
-mapCanvas.style.cursor = 'pointer';
+window.addEventListener('keyup', (e) => {
+  if (e.key in keys || e.key === 'w' || e.key === 'a' || e.key === 's' || e.key === 'd') {
+    keys[e.key] = false;
+    e.preventDefault();
+  }
+});
+
+function updateCameraMovement() {
+  let moved = false;
+  const speed = camera.moveSpeed / camera.zoom;
+  
+  if (keys.w || keys.ArrowUp) {
+    camera.y -= speed;
+    moved = true;
+  }
+  if (keys.s || keys.ArrowDown) {
+    camera.y += speed;
+    moved = true;
+  }
+  if (keys.a || keys.ArrowLeft) {
+    camera.x -= speed;
+    moved = true;
+  }
+  if (keys.d || keys.ArrowRight) {
+    camera.x += speed;
+    moved = true;
+  }
+  
+  if (moved) {
+    renderCamera();
+  }
+}
+
+window.addEventListener('wheel', (e) => {
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+  }
+}, { passive: false });
+
+window.addEventListener('gesturestart', (e) => {
+  e.preventDefault();
+}, { passive: false });
+
+window.addEventListener('gesturechange', (e) => {
+  e.preventDefault();
+}, { passive: false });
+
+window.addEventListener('gestureend', (e) => {
+  e.preventDefault();
+}, { passive: false });
+
+mapCanvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  
+  const rect = mapCanvas.getBoundingClientRect();
+  const mouseX = e.clientX - rect.left;
+  const mouseY = e.clientY - rect.top;
+  
+  const screenWidth = window.innerWidth;
+  const screenHeight = window.innerHeight;
+  
+  const minZoomX = screenWidth / MAP_WIDTH;
+  const minZoomY = screenHeight / MAP_HEIGHT;
+  const minZoom = Math.max(minZoomX, minZoomY);
+  
+  const worldX = camera.x + (mouseX / screenWidth) * (screenWidth / camera.zoom);
+  const worldY = camera.y + (mouseY / screenHeight) * (screenHeight / camera.zoom);
+  
+  const zoomSpeed = 0.1;
+  const delta = e.deltaY > 0 ? -zoomSpeed : zoomSpeed;
+  
+  const oldZoom = camera.zoom;
+  const newZoom = Math.max(minZoom, Math.min(camera.maxZoom, camera.zoom + delta));
+  
+  camera.targetZoom = newZoom;
+  camera.zoom = newZoom;
+  
+  camera.x = worldX - (mouseX / screenWidth) * (screenWidth / camera.zoom);
+  camera.y = worldY - (mouseY / screenHeight) * (screenHeight / camera.zoom);
+  
+  renderCamera();
+}, { passive: false });
+
+mapCanvas.style.cursor = 'default';
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -1984,8 +1977,6 @@ document.getElementById('playBtn').addEventListener('click', async () => {
     
     document.getElementById('gameUI').style.display = 'block';
     
-    // Initial render
-    renderOverlay();
     renderCamera();
     
     // Start simulation
@@ -2013,9 +2004,6 @@ function gameLoop() {
   const now = Date.now();
   const speed = SPEEDS[gameState.speed];
   
-  // Update camera from keyboard
-  updateCameraFromKeys();
-  
   if (speed > 0 && gameState.running) {
     const interval = 1000 / speed; // ms per tick
     
@@ -2025,8 +2013,8 @@ function gameLoop() {
     }
   }
   
-  // Render every frame for smooth camera movement
-  renderCamera();
+  // Update camera movement every frame
+  updateCameraMovement();
   
   requestAnimationFrame(gameLoop);
 }
