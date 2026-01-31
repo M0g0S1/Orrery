@@ -82,15 +82,6 @@ function updateEventLog() {
   }
 }
 
-let gameState = {
-  year: 0,
-  running: false,
-  speed: 2, // 0=pause, 1=slow, 2=normal, 3=fast, 4=ultra
-  tribes: [],
-  countries: [],
-  events: []
-};
-
 const SPEEDS = {
   0: 0,      // paused
   1: 1,      // slow (1 tick/sec)
