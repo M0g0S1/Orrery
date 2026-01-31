@@ -36,801 +36,790 @@ let worldRng = null;
 let worldNoise = null;
 
 // ============================================
-// SEEDED RNG + SIMPLEX NOISE
+// NAME GENERATION (VASTLY EXPANDED)
 // ============================================
-class SeededRNG {
-  constructor(seed) {
-    this.seed = seed % 2147483647;
-    if (this.seed <= 0) this.seed += 2147483646;
-  }
-  next() {
-    this.seed = (this.seed * 48271) % 2147483647;
-    return this.seed / 2147483647;
-  }
-  range(min, max) {
-    return min + this.next() * (max - min);
-  }
-  int(min, max) {
-    return Math.floor(this.range(min, max + 1));
-  }
-  choice(arr) {
-    return arr[Math.floor(this.next() * arr.length)];
-  }
+const nameData = {
+  // Tribe name prefixes (expanded from ~10 to 100+)
+  tribePrefixes: [
+    'Red', 'Blue', 'Green', 'White', 'Black', 'Grey', 'Golden', 'Silver', 'Bronze',
+    'Iron', 'Stone', 'Wind', 'River', 'Mountain', 'Forest', 'Desert', 'Snow', 'Fire',
+    'Water', 'Thunder', 'Storm', 'Cloud', 'Sun', 'Moon', 'Star', 'Sky', 'Ocean',
+    'Sea', 'Lake', 'Valley', 'Hill', 'Peak', 'Cliff', 'Canyon', 'Marsh', 'Swamp',
+    'Grass', 'Sand', 'Dust', 'Ash', 'Frost', 'Ice', 'Flame', 'Ember', 'Spark',
+    'Dawn', 'Dusk', 'Shadow', 'Light', 'Dark', 'Bright', 'Pale', 'Deep', 'High',
+    'Low', 'Far', 'Near', 'Ancient', 'Old', 'Young', 'New', 'First', 'Last',
+    'Wild', 'Free', 'Proud', 'Strong', 'Swift', 'Wise', 'Brave', 'Bold', 'Fierce',
+    'Silent', 'Loud', 'Hidden', 'Open', 'Sacred', 'Holy', 'Blessed', 'Cursed',
+    'Eagle', 'Wolf', 'Bear', 'Fox', 'Hawk', 'Raven', 'Crow', 'Owl', 'Tiger',
+    'Lion', 'Panther', 'Deer', 'Elk', 'Bison', 'Buffalo', 'Mammoth', 'Serpent',
+    'Dragon', 'Phoenix', 'Turtle', 'Salmon', 'Whale', 'Shark', 'Dolphin', 'Otter',
+    'Beaver', 'Badger', 'Raccoon', 'Lynx', 'Coyote', 'Jaguar', 'Leopard', 'Cheetah',
+    'Rhino', 'Elephant', 'Horse', 'Caribou', 'Moose', 'Antelope', 'Gazelle'
+  ],
+
+  tribeSuffixes: [
+    'Walkers', 'Runners', 'Hunters', 'Gatherers', 'Warriors', 'Riders', 'Wanderers',
+    'Nomads', 'Dwellers', 'People', 'Clan', 'Tribe', 'Band', 'Group', 'Folk',
+    'Kin', 'Children', 'Sons', 'Daughters', 'Born', 'Bound', 'Keepers', 'Watchers',
+    'Seekers', 'Finders', 'Makers', 'Builders', 'Crafters', 'Shapers', 'Weavers',
+    'Singers', 'Dancers', 'Dreamers', 'Seers', 'Speakers', 'Tellers', 'Listeners',
+    'Trackers', 'Scouts', 'Guards', 'Defenders', 'Protectors', 'Raiders', 'Rovers',
+    'Striders', 'Stalkers', 'Prowlers', 'Climbers', 'Jumpers', 'Swimmers', 'Divers',
+    'Fishers', 'Planters', 'Herders', 'Shepherds', 'Tamers', 'Breeders', 'Carvers',
+    'Painters', 'Potters', 'Smiths', 'Forgers', 'Miners', 'Diggers', 'Cutters'
+  ],
+
+  // City/Civilization name components (expanded from ~20 to 150+)
+  cityPrefixes: [
+    'Ak', 'Al', 'An', 'Ar', 'As', 'Ba', 'Be', 'Bra', 'Ca', 'Ce', 'Cha', 'Da', 'De',
+    'Dra', 'El', 'En', 'Er', 'Es', 'Fa', 'Fe', 'Ga', 'Ge', 'Gra', 'Ha', 'He', 'Il',
+    'In', 'Ir', 'Ka', 'Ke', 'Kha', 'Ki', 'Ko', 'Kra', 'La', 'Le', 'Li', 'Lo', 'Lu',
+    'Ma', 'Me', 'Mi', 'Mo', 'Mu', 'Na', 'Ne', 'Ni', 'No', 'Nu', 'Nya', 'O', 'Pa',
+    'Pe', 'Phi', 'Pra', 'Qa', 'Qi', 'Ra', 'Re', 'Rha', 'Ri', 'Ro', 'Sa', 'Se', 'Sha',
+    'Si', 'So', 'Sta', 'Ta', 'Te', 'Tha', 'Ti', 'To', 'Tra', 'Tsa', 'Ua', 'Ul', 'Um',
+    'Un', 'Ur', 'Us', 'Va', 'Ve', 'Vi', 'Vo', 'Vra', 'Wa', 'We', 'Wi', 'Xa', 'Xe',
+    'Ya', 'Ye', 'Yi', 'Za', 'Ze', 'Zha', 'Zi', 'Zo', 'Zu',
+    // Additional exotic combinations
+    'Aer', 'Aes', 'Aur', 'Bel', 'Bor', 'Cor', 'Cyr', 'Dal', 'Dor', 'Dul', 'Eir',
+    'Eor', 'Far', 'Fel', 'Fir', 'Gar', 'Gil', 'Gol', 'Hal', 'Har', 'Hel', 'Hor',
+    'Ial', 'Ior', 'Jal', 'Jor', 'Kal', 'Kar', 'Kel', 'Ker', 'Kir', 'Kor', 'Kul',
+    'Kur', 'Lal', 'Lar', 'Lir', 'Lor', 'Lur', 'Mal', 'Mar', 'Mel', 'Mer', 'Mir',
+    'Mor', 'Mul', 'Mur', 'Nal', 'Nar', 'Nel', 'Ner', 'Nil', 'Nor', 'Nul', 'Nur'
+  ],
+
+  citySuffixes: [
+    'ad', 'ak', 'al', 'an', 'ar', 'as', 'at', 'ax', 'ath', 'ba', 'bek', 'ben', 'ber',
+    'beth', 'bor', 'ca', 'cath', 'chan', 'che', 'chi', 'cor', 'da', 'dan', 'dar', 'dek',
+    'del', 'den', 'dor', 'dus', 'ea', 'ech', 'ed', 'ek', 'el', 'em', 'en', 'er', 'es',
+    'eth', 'fa', 'fal', 'fan', 'fer', 'fin', 'fir', 'for', 'ga', 'gan', 'gar', 'gen',
+    'ger', 'gis', 'gol', 'gon', 'gor', 'grad', 'grim', 'ha', 'had', 'ham', 'han', 'har',
+    'has', 'haven', 'helm', 'hold', 'ia', 'ian', 'iar', 'ias', 'ica', 'ich', 'ida',
+    'idon', 'il', 'ila', 'im', 'in', 'ion', 'ir', 'is', 'ith', 'ka', 'kan', 'kar',
+    'kas', 'kath', 'ken', 'kor', 'la', 'lan', 'lar', 'las', 'lath', 'len', 'lin', 'lis',
+    'lon', 'lor', 'los', 'lum', 'lun', 'lus', 'ma', 'mal', 'man', 'mar', 'mas', 'mel',
+    'mer', 'mes', 'meth', 'mir', 'mis', 'mon', 'mor', 'mos', 'mul', 'mun', 'mus', 'na',
+    'nad', 'nal', 'nam', 'nan', 'nar', 'nas', 'nath', 'nel', 'nia', 'nis', 'nok', 'nor',
+    'nos', 'num', 'nus', 'nya', 'oa', 'onas', 'on', 'or', 'os', 'oth', 'pa', 'pan',
+    'par', 'pel', 'pen', 'per', 'pha', 'phen', 'pol', 'por', 'qa', 'qar', 'qin', 'ra',
+    'rad', 'ral', 'ran', 'ras', 'rath', 'rel', 'ren', 'res', 'reth', 'ria', 'rin', 'ris',
+    'ron', 'ros', 'rum', 'rus', 'ryn'
+  ],
+
+  // Civilization name components (NEW - doesn't use "Civilization" suffix)
+  civPrefixes: [
+    'Aeg', 'Aer', 'Aet', 'Alb', 'Ald', 'Ale', 'Alt', 'Amb', 'Ang', 'Ant', 'Aqu',
+    'Arc', 'Ard', 'Arg', 'Arm', 'Asc', 'Ast', 'Ath', 'Atl', 'Aur', 'Aus', 'Ava',
+    'Axi', 'Azo', 'Bal', 'Bar', 'Bat', 'Bel', 'Ben', 'Ber', 'Bor', 'Bra', 'Bri',
+    'Bru', 'Bul', 'Bur', 'Byz', 'Cal', 'Cam', 'Can', 'Cap', 'Car', 'Cas', 'Cat',
+    'Cel', 'Cer', 'Cha', 'Che', 'Chi', 'Cim', 'Cla', 'Col', 'Con', 'Cor', 'Cre',
+    'Cro', 'Cyr', 'Dac', 'Dal', 'Dam', 'Dan', 'Dar', 'Del', 'Den', 'Dor', 'Dra',
+    'Dur', 'Ebe', 'Ech', 'Egy', 'Ela', 'Elb', 'Elv', 'Epi', 'Ere', 'Eri', 'Eth',
+    'Etr', 'Fal', 'Far', 'Fen', 'Fer', 'Fla', 'For', 'Fra', 'Fri', 'Gal', 'Gar',
+    'Gau', 'Gel', 'Ger', 'Gil', 'Gol', 'Got', 'Gra', 'Gre', 'Gue', 'Had', 'Haf',
+    'Hal', 'Han', 'Har', 'Has', 'Hel', 'Her', 'Het', 'Hib', 'Hip', 'Hit', 'Hol',
+    'Hum', 'Hun', 'Hur', 'Hyb', 'Hyk', 'Hyr', 'Ibe', 'Ice', 'Idy', 'Ila', 'Ily',
+    'Ind', 'Ion', 'Ira', 'Isa', 'Isl', 'Isr', 'Ist', 'Ita', 'Jav', 'Jer', 'Jud',
+    'Jul', 'Jut', 'Kab', 'Kad', 'Kal', 'Kam', 'Kar', 'Kas', 'Kel', 'Kha', 'Khi',
+    'Kho', 'Khy', 'Kin', 'Kol', 'Kor', 'Kur', 'Kus', 'Lab', 'Lac', 'Lam', 'Lan',
+    'Lar', 'Lat', 'Lau', 'Lec', 'Led', 'Lem', 'Leo', 'Les', 'Let', 'Lev', 'Lib',
+    'Lic', 'Lig', 'Lin', 'Lit', 'Liv', 'Lom', 'Lon', 'Lor', 'Lot', 'Luc', 'Lug',
+    'Lus', 'Lut', 'Lyc', 'Lyd', 'Mac', 'Mad', 'Mag', 'Mal', 'Man', 'Mar', 'Mas',
+    'Mau', 'Max', 'Med', 'Meg', 'Mel', 'Mem', 'Men', 'Mer', 'Mes', 'Met', 'Mid',
+    'Mil', 'Min', 'Mit', 'Moe', 'Mol', 'Mon', 'Mor', 'Mos', 'Mug', 'Mur', 'Myc',
+    'Myr', 'Nab', 'Nap', 'Nar', 'Nas', 'Nav', 'Nax', 'Nea', 'Neb', 'Nem', 'Neo',
+    'Ner', 'Nes', 'Nev', 'Nic', 'Nil', 'Nin', 'Nip', 'Nor', 'Nov', 'Nub', 'Num',
+    'Nym', 'Oce', 'Odo', 'Oen', 'Oly', 'Oph', 'Ora', 'Orc', 'Ore', 'Ori', 'Oro',
+    'Ors', 'Ost', 'Ott', 'Pac', 'Pal', 'Pan', 'Pap', 'Par', 'Pat', 'Pau', 'Pax',
+    'Pel', 'Per', 'Pet', 'Pha', 'Phe', 'Phi', 'Pho', 'Phr', 'Pic', 'Pis', 'Pit',
+    'Pla', 'Ple', 'Pol', 'Pom', 'Pon', 'Por', 'Pos', 'Pot', 'Pra', 'Pri', 'Pro',
+    'Pru', 'Pto', 'Pun', 'Pyr', 'Qad', 'Qar', 'Qat', 'Que', 'Qui', 'Quo', 'Rab',
+    'Rae', 'Rag', 'Ram', 'Rav', 'Rax', 'Rea', 'Red', 'Reg', 'Rha', 'Rhe', 'Rho',
+    'Ric', 'Rif', 'Rig', 'Rim', 'Rin', 'Riv', 'Roa', 'Rod', 'Rom', 'Ros', 'Rot',
+    'Rub', 'Rud', 'Rus', 'Rut', 'Sab', 'Sac', 'Sad', 'Sag', 'Sah', 'Sal', 'Sam',
+    'San', 'Sar', 'Sat', 'Sau', 'Sav', 'Sax', 'Sca', 'Sce', 'Sci', 'Sco', 'Scy',
+    'Seb', 'Sed', 'Seg', 'Sel', 'Sem', 'Sen', 'Sep', 'Ser', 'Set', 'Sev', 'Sib',
+    'Sic', 'Sid', 'Sie', 'Sig', 'Sil', 'Sin', 'Sir', 'Sis', 'Sit', 'Ska', 'Sla',
+    'Slo', 'Smy', 'Sob', 'Soc', 'Sog', 'Sol', 'Som', 'Sor', 'Spa', 'Spe', 'Sph',
+    'Spo', 'Sta', 'Ste', 'Sto', 'Str', 'Stu', 'Sty', 'Sub', 'Sud', 'Sue', 'Sug',
+    'Sul', 'Sum', 'Sun', 'Sur', 'Sus', 'Swa', 'Swe', 'Swi', 'Syb', 'Syd', 'Syl',
+    'Sym', 'Syn', 'Syr', 'Tab', 'Tac', 'Tad', 'Tae', 'Taj', 'Tal', 'Tam', 'Tan',
+    'Tap', 'Tar', 'Tas', 'Tat', 'Tau', 'Tax', 'Teb', 'Tec', 'Teg', 'Tel', 'Tem',
+    'Ten', 'Ter', 'Tet', 'Teu', 'Tex', 'Tha', 'The', 'Thi', 'Tho', 'Thr', 'Thu',
+    'Thy', 'Tib', 'Tic', 'Tid', 'Til', 'Tim', 'Tin', 'Tir', 'Tit', 'Tiv', 'Tob',
+    'Toc', 'Tog', 'Tol', 'Tom', 'Ton', 'Top', 'Tor', 'Tot', 'Tou', 'Tow', 'Tra',
+    'Tre', 'Tri', 'Tro', 'Tru', 'Tsa', 'Tse', 'Tsi', 'Tso', 'Tsu', 'Tua', 'Tub',
+    'Tuc', 'Tud', 'Tug', 'Tul', 'Tum', 'Tun', 'Tur', 'Tus', 'Tut', 'Tyl', 'Tyn',
+    'Tyr', 'Ubi', 'Udo', 'Ufa', 'Uga', 'Uju', 'Ula', 'Ule', 'Uli', 'Ulo', 'Ulu',
+    'Uma', 'Umb', 'Ume', 'Umi', 'Umu', 'Una', 'Und', 'Une', 'Ung', 'Uni', 'Uno',
+    'Upa', 'Upe', 'Uph', 'Upo', 'Ura', 'Urb', 'Urc', 'Urd', 'Ure', 'Urg', 'Uri',
+    'Urn', 'Uro', 'Urr', 'Urs', 'Uru', 'Usa', 'Use', 'Ush', 'Usk', 'Uso', 'Ust',
+    'Uta', 'Ute', 'Uth', 'Uto', 'Utr', 'Uts', 'Utu', 'Uva', 'Uve', 'Uvi', 'Uvo',
+    'Uvu', 'Uza', 'Uze', 'Uzi', 'Uzo', 'Uzu'
+  ],
+
+  civSuffixes: [
+    'ia', 'nia', 'aria', 'eria', 'uria', 'oria', 'yria', 'sia', 'tia', 'lia', 'ria',
+    'an', 'ian', 'ean', 'yan', 'lan', 'ran', 'stan', 'tan', 'van', 'wan',
+    'and', 'land', 'eland', 'oland', 'uland', 'yland',
+    'ia', 'ica', 'ina', 'isa', 'ita', 'iva', 'iza',
+    'os', 'ios', 'aos', 'eos', 'uos', 'yos',
+    'um', 'ium', 'eum', 'uum', 'yum',
+    'is', 'is', 'ais', 'eis', 'ois', 'uis',
+    'es', 'ies', 'aes', 'ees', 'oes', 'ues',
+    'on', 'ion', 'aon', 'eon', 'yon',
+    'ar', 'iar', 'ear', 'uar', 'yar',
+    'or', 'ior', 'eor', 'uor', 'yor',
+    'us', 'ius', 'eus', 'uus', 'yus',
+    'en', 'ien', 'aen', 'een', 'uen',
+    'el', 'iel', 'ael', 'eel', 'uel',
+    'al', 'ial', 'eal', 'ual', 'yal',
+    'ond', 'iond', 'eond', 'uond', 'yond',
+    'arn', 'iarn', 'earn', 'uarn', 'yarn',
+    'ern', 'iern', 'aern', 'uern', 'yern',
+    'orn', 'iorn', 'aorn', 'eorn', 'uorn',
+    'ax', 'iax', 'eax', 'uax', 'yax',
+    'ex', 'iex', 'aex', 'uex', 'yex',
+    'ix', 'aix', 'eix', 'uix', 'yix',
+    'ox', 'iox', 'aox', 'eox', 'uox',
+    'ux', 'iux', 'aux', 'eux', 'yux',
+    'esh', 'iesh', 'aesh', 'eesh', 'uesh',
+    'ash', 'iash', 'eash', 'uash', 'yash',
+    'osh', 'iosh', 'aosh', 'eosh', 'uosh',
+    'ush', 'iush', 'aush', 'eush', 'yush',
+    'eth', 'ieth', 'aeth', 'eeth', 'ueth',
+    'ath', 'iath', 'eath', 'uath', 'yath',
+    'oth', 'ioth', 'aoth', 'eoth', 'uoth'
+  ],
+
+  // Leader name components (expanded)
+  leaderFirstNames: [
+    'Alaric', 'Baldwin', 'Cedric', 'Darius', 'Edmund', 'Felix', 'Gareth', 'Harald',
+    'Ivan', 'Julius', 'Konrad', 'Leopold', 'Magnus', 'Nero', 'Otto', 'Perseus',
+    'Quintus', 'Ragnar', 'Sigurd', 'Titus', 'Ulric', 'Victor', 'Werner', 'Xavier',
+    'Yuri', 'Zeno', 'Adrian', 'Brutus', 'Cassius', 'Draco', 'Erik', 'Friedrich',
+    'Gustav', 'Henrik', 'Igor', 'Johan', 'Karl', 'Ludwig', 'Mikhail', 'Nikolas',
+    'Odin', 'Pavel', 'Quintilian', 'Rudolf', 'Stefan', 'Theodor', 'Ulysses', 'Valerius',
+    'Wilhelm', 'Xerxes', 'Yaroslav', 'Zacharias', 'Aetius', 'Boris', 'Constantine',
+    'Dimitri', 'Erasmus', 'Flavius', 'Gregorius', 'Hector', 'Ignatius', 'Justinian',
+    'Konstantin', 'Leonidas', 'Maximus', 'Nero', 'Octavius', 'Pontius', 'Quintus',
+    'Romulus', 'Severus', 'Tiberius', 'Urbanus', 'Valentinian', 'Wulfric', 'Xander',
+    // Female names
+    'Aelia', 'Beatrix', 'Claudia', 'Diana', 'Eleanor', 'Freya', 'Guinevere', 'Helena',
+    'Irene', 'Julia', 'Katarina', 'Livia', 'Morgana', 'Natalia', 'Octavia', 'Priscilla',
+    'Quintessa', 'Regina', 'Sabina', 'Tatiana', 'Ursula', 'Valentina', 'Wilhelmina',
+    'Xenia', 'Yvonne', 'Zenobia', 'Anastasia', 'Brigitte', 'Cassandra', 'Drusilla',
+    'Elara', 'Felicia', 'Giselle', 'Hypatia', 'Isolde', 'Josephine', 'Kassandra',
+    'Lucretia', 'Marcella', 'Nora', 'Ophelia', 'Perpetua', 'Quintina', 'Rowena',
+    'Seraphina', 'Theodora', 'Ulrika', 'Victoria', 'Winifred', 'Xiomara', 'Yasmin', 'Zara'
+  ],
+
+  leaderTitles: [
+    'the Great', 'the Wise', 'the Bold', 'the Brave', 'the Just', 'the Terrible',
+    'the Conqueror', 'the Builder', 'the Diplomat', 'the Defender', 'the Unifier',
+    'the Merciful', 'the Cruel', 'the Pious', 'the Scholar', 'the Warrior',
+    'the Reformer', 'the Lawgiver', 'the Navigator', 'the Explorer', 'the Liberator',
+    'the Iron', 'the Golden', 'the Silver', 'the Bronze', 'the Strong', 'the Swift',
+    'the Silent', 'the Eloquent', 'the Patient', 'the Restless', 'the Ambitious',
+    'the Cautious', 'the Fearless', 'the Noble', 'the Common', 'the Young',
+    'the Old', 'the First', 'the Last', 'the Elder', 'the Younger', 'the Fair',
+    'the Dark', 'the Red', 'the White', 'the Black', 'the Blessed', 'the Cursed',
+    'the Holy', 'the Unholy', 'the Righteous', 'the Wicked', 'the Mad', 'the Sane'
+  ],
+
+  // City name components (more variety)
+  cityMiddles: [
+    '', '', '', '', 'a', 'e', 'i', 'o', 'u', 'ar', 'er', 'or', 'an', 'en', 'on',
+    'al', 'el', 'il', 'ol', 'ul', 'am', 'em', 'im', 'om', 'um', 'at', 'et', 'it', 'ot', 'ut'
+  ]
+};
+
+function pickRandom(arr, rng = Math.random) {
+  return arr[Math.floor(rng() * arr.length)];
 }
 
-class SimplexNoise {
-  constructor(rng) {
-    const p = [];
-    for (let i = 0; i < 256; i++) p[i] = i;
-    for (let i = 255; i > 0; i--) {
-      const j = Math.floor(rng.next() * (i + 1));
-      [p[i], p[j]] = [p[j], p[i]];
-    }
-    this.perm = new Uint8Array(512);
-    this.permMod12 = new Uint8Array(512);
-    for (let i = 0; i < 512; i++) {
-      this.perm[i] = p[i & 255];
-      this.permMod12[i] = this.perm[i] % 12;
-    }
-    this.grad3 = new Float32Array([
-      1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1, 0,
-      1, 0, 1, -1, 0, 1, 1, 0, -1, -1, 0, -1,
-      0, 1, 1, 0, -1, 1, 0, 1, -1, 0, -1, -1
-    ]);
-    this.F2 = 0.5 * (Math.sqrt(3.0) - 1.0);
-    this.G2 = (3.0 - Math.sqrt(3.0)) / 6.0;
+function generateTribeName(rng = Math.random) {
+  const prefix = pickRandom(nameData.tribePrefixes, rng);
+  const suffix = pickRandom(nameData.tribeSuffixes, rng);
+  return `${prefix} ${suffix}`;
+}
+
+function generateCityName(rng = Math.random) {
+  const prefix = pickRandom(nameData.cityPrefixes, rng);
+  const middle = pickRandom(nameData.cityMiddles, rng);
+  const suffix = pickRandom(nameData.citySuffixes, rng);
+  return prefix + middle + suffix;
+}
+
+// NEW: Generate civilization names WITHOUT "Civilization" suffix
+function generateCivilizationName(rng = Math.random) {
+  const prefix = pickRandom(nameData.civPrefixes, rng);
+  const suffix = pickRandom(nameData.civSuffixes, rng);
+  return prefix + suffix;
+}
+
+function generateLeaderName(rng = Math.random) {
+  const first = pickRandom(nameData.leaderFirstNames, rng);
+  const useTitle = rng() > 0.4;
+  if (useTitle) {
+    const title = pickRandom(nameData.leaderTitles, rng);
+    return `${first} ${title}`;
   }
-  noise2D(xin, yin) {
+  return first;
+}
+
+// ============================================
+// SEEDED RNG
+// ============================================
+function mulberry32(a) {
+  return function() {
+    let t = a += 0x6D2B79F5;
+    t = Math.imul(t ^ t >>> 15, t | 1);
+    t ^= t + Math.imul(t ^ t >>> 7, t | 61);
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+// ============================================
+// SIMPLEX NOISE
+// ============================================
+class SimplexNoise {
+  constructor(seed = Date.now()) {
+    this.seed = seed;
+    this.p = [];
+    const seedRng = mulberry32(seed);
+    for (let i = 0; i < 256; i++) this.p[i] = i;
+    for (let i = 255; i > 0; i--) {
+      const j = Math.floor(seedRng() * (i + 1));
+      [this.p[i], this.p[j]] = [this.p[j], this.p[i]];
+    }
+    this.p = this.p.concat(this.p);
+  }
+
+  dot2(g, x, y) {
+    return g[0] * x + g[1] * y;
+  }
+
+  noise2D(x, y) {
+    const grad3 = [
+      [1, 1], [-1, 1], [1, -1], [-1, -1],
+      [1, 0], [-1, 0], [0, 1], [0, -1]
+    ];
+    const F2 = 0.5 * (Math.sqrt(3.0) - 1.0);
+    const G2 = (3.0 - Math.sqrt(3.0)) / 6.0;
     let n0, n1, n2;
-    const s = (xin + yin) * this.F2;
-    const i = Math.floor(xin + s);
-    const j = Math.floor(yin + s);
-    const t = (i + j) * this.G2;
+    const s = (x + y) * F2;
+    const i = Math.floor(x + s);
+    const j = Math.floor(y + s);
+    const t = (i + j) * G2;
     const X0 = i - t;
     const Y0 = j - t;
-    const x0 = xin - X0;
-    const y0 = yin - Y0;
+    const x0 = x - X0;
+    const y0 = y - Y0;
     let i1, j1;
     if (x0 > y0) { i1 = 1; j1 = 0; }
     else { i1 = 0; j1 = 1; }
-    const x1 = x0 - i1 + this.G2;
-    const y1 = y0 - j1 + this.G2;
-    const x2 = x0 - 1.0 + 2.0 * this.G2;
-    const y2 = y0 - 1.0 + 2.0 * this.G2;
+    const x1 = x0 - i1 + G2;
+    const y1 = y0 - j1 + G2;
+    const x2 = x0 - 1.0 + 2.0 * G2;
+    const y2 = y0 - 1.0 + 2.0 * G2;
     const ii = i & 255;
     const jj = j & 255;
-    const gi0 = this.permMod12[ii + this.perm[jj]] * 3;
-    const gi1 = this.permMod12[ii + i1 + this.perm[jj + j1]] * 3;
-    const gi2 = this.permMod12[ii + 1 + this.perm[jj + 1]] * 3;
+    const gi0 = this.p[ii + this.p[jj]] % 8;
+    const gi1 = this.p[ii + i1 + this.p[jj + j1]] % 8;
+    const gi2 = this.p[ii + 1 + this.p[jj + 1]] % 8;
     let t0 = 0.5 - x0 * x0 - y0 * y0;
     if (t0 < 0) n0 = 0.0;
     else {
-      const g = this.grad3;
       t0 *= t0;
-      n0 = t0 * t0 * (g[gi0] * x0 + g[gi0 + 1] * y0);
+      n0 = t0 * t0 * this.dot2(grad3[gi0], x0, y0);
     }
     let t1 = 0.5 - x1 * x1 - y1 * y1;
     if (t1 < 0) n1 = 0.0;
     else {
-      const g = this.grad3;
       t1 *= t1;
-      n1 = t1 * t1 * (g[gi1] * x1 + g[gi1 + 1] * y1);
+      n1 = t1 * t1 * this.dot2(grad3[gi1], x1, y1);
     }
     let t2 = 0.5 - x2 * x2 - y2 * y2;
     if (t2 < 0) n2 = 0.0;
     else {
-      const g = this.grad3;
       t2 *= t2;
-      n2 = t2 * t2 * (g[gi2] * x2 + g[gi2 + 1] * y2);
+      n2 = t2 * t2 * this.dot2(grad3[gi2], x2, y2);
     }
     return 70.0 * (n0 + n1 + n2);
   }
 }
 
 // ============================================
-// EXPANDED NAME POOLS - WAY MORE NAMES
+// PLANET GENERATION
 // ============================================
-const NAME_POOLS = {
-  // MASSIVELY EXPANDED tribe/civilization prefixes
-  prefixes: [
-    'Akar', 'Amun', 'Anzu', 'Balar', 'Barak', 'Belos', 'Canar', 'Carul', 'Dagon', 'Darak',
-    'Ekur', 'Elar', 'Farak', 'Fenris', 'Galar', 'Gorun', 'Harak', 'Helos', 'Inar', 'Istar',
-    'Jarak', 'Kalar', 'Karun', 'Larak', 'Malar', 'Moros', 'Nakar', 'Nimar', 'Okar', 'Orun',
-    'Palar', 'Qumar', 'Rakan', 'Salar', 'Talar', 'Telos', 'Ukar', 'Valar', 'Warak', 'Xalar',
-    'Yarak', 'Zalar', 'Ashur', 'Belos', 'Carak', 'Dakar', 'Elros', 'Feros', 'Goran', 'Harak',
-    'Ibor', 'Joros', 'Keros', 'Loros', 'Marak', 'Noros', 'Othar', 'Poros', 'Qoros', 'Roros',
-    'Soros', 'Thoros', 'Uros', 'Voros', 'Woros', 'Xoros', 'Yoros', 'Zoros', 'Athar', 'Belar',
-    'Corak', 'Durak', 'Ezran', 'Faros', 'Goros', 'Hular', 'Ixar', 'Jular', 'Kular', 'Lular',
-    'Mular', 'Nular', 'Oktar', 'Pular', 'Qular', 'Rular', 'Solar', 'Tular', 'Uktar', 'Vular',
-    'Wular', 'Xular', 'Yular', 'Zular', 'Azor', 'Boran', 'Cyrus', 'Doran', 'Ezan', 'Faran',
-    'Garan', 'Haran', 'Izan', 'Jaran', 'Karan', 'Laran', 'Maran', 'Naran', 'Oran', 'Paran',
-    'Qaran', 'Raran', 'Saran', 'Taran', 'Uran', 'Varan', 'Waran', 'Xaran', 'Yaran', 'Zaran',
-    'Akros', 'Baros', 'Caros', 'Daros', 'Eros', 'Faros', 'Garos', 'Haros', 'Iros', 'Jaros',
-    'Karos', 'Laros', 'Maros', 'Naros', 'Oros', 'Paros', 'Qaros', 'Raros', 'Saros', 'Taros',
-    'Uros', 'Varos', 'Waros', 'Xaros', 'Yaros', 'Zaros', 'Adran', 'Belan', 'Celan', 'Delan',
-    'Elan', 'Felan', 'Gelan', 'Helan', 'Ilan', 'Jelan', 'Kelan', 'Lelan', 'Melan', 'Nelan',
-    'Olan', 'Pelan', 'Qelan', 'Relan', 'Selan', 'Telan', 'Uelan', 'Velan', 'Welan', 'Xelan',
-    'Yelan', 'Zelan', 'Azur', 'Bezur', 'Cezur', 'Dezur', 'Ezur', 'Fezur', 'Gezur', 'Hezur',
-    'Izur', 'Jezur', 'Kezur', 'Lezur', 'Mezur', 'Nezur', 'Ozur', 'Pezur', 'Qezur', 'Rezur'
-  ],
-  
-  // MASSIVELY EXPANDED suffixes
-  suffixes: [
-    'an', 'en', 'ian', 'on', 'ar', 'or', 'us', 'is', 'os', 'as',
-    'eth', 'ath', 'oth', 'ith', 'uth', 'yn', 'in', 'un', 'an', 'on',
-    'el', 'al', 'ol', 'il', 'ul', 'ak', 'ek', 'ik', 'ok', 'uk',
-    'ara', 'era', 'ira', 'ora', 'ura', 'ane', 'ene', 'ine', 'one', 'une',
-    'ath', 'eth', 'ith', 'oth', 'uth', 'ar', 'er', 'ir', 'or', 'ur',
-    'ax', 'ex', 'ix', 'ox', 'ux', 'az', 'ez', 'iz', 'oz', 'uz',
-    'ian', 'ean', 'oan', 'uan', 'yan', 'lar', 'nar', 'tar', 'kar', 'mar',
-    'len', 'nen', 'ten', 'ken', 'men', 'los', 'nos', 'tos', 'kos', 'mos',
-    'lis', 'nis', 'tis', 'kis', 'mis', 'lus', 'nus', 'tus', 'kus', 'mus',
-    'ra', 'na', 'ta', 'ka', 'ma', 'ro', 'no', 'to', 'ko', 'mo',
-    'rus', 'nus', 'tus', 'kus', 'mus', 'ris', 'nis', 'tis', 'kis', 'mis',
-    'ren', 'nen', 'ten', 'ken', 'men', 'ran', 'nan', 'tan', 'kan', 'man'
-  ],
-  
-  // MASSIVELY EXPANDED leader names (first names)
-  leaderFirstNames: [
-    'Aeron', 'Aldric', 'Aleron', 'Amos', 'Andor', 'Arkan', 'Asher', 'Athos', 'Azor', 'Balor',
-    'Barak', 'Belen', 'Boris', 'Cael', 'Caius', 'Caleb', 'Castor', 'Cedric', 'Cyrus', 'Dagon',
-    'Darius', 'Davos', 'Doran', 'Draven', 'Ector', 'Eldon', 'Elex', 'Elric', 'Endor', 'Eris',
-    'Eryx', 'Ezra', 'Faron', 'Felix', 'Fenris', 'Galen', 'Gareth', 'Gideon', 'Gorin', 'Hakan',
-    'Haldor', 'Harlan', 'Hector', 'Helios', 'Henrik', 'Heron', 'Iban', 'Icarus', 'Igor', 'Ilan',
-    'Imran', 'Inor', 'Ivar', 'Jace', 'Jared', 'Jaron', 'Joran', 'Kael', 'Kain', 'Kalen',
-    'Kalos', 'Karan', 'Karel', 'Kato', 'Keros', 'Klaus', 'Kyros', 'Lazar', 'Leif', 'Leon',
-    'Leron', 'Loras', 'Lucian', 'Magnus', 'Malik', 'Marcus', 'Marius', 'Maxim', 'Melkor', 'Meros',
-    'Milan', 'Moran', 'Nero', 'Nicos', 'Nolan', 'Oberon', 'Odin', 'Omeros', 'Orion', 'Osric',
-    'Otto', 'Pavel', 'Paxon', 'Perrin', 'Petra', 'Pyrrhus', 'Quinn', 'Ragnar', 'Raven', 'Remus',
-    'Renly', 'Rheon', 'Rogan', 'Roland', 'Roman', 'Rorik', 'Rylan', 'Sagan', 'Saul', 'Saxon',
-    'Selas', 'Seron', 'Silas', 'Solon', 'Stefan', 'Sven', 'Talan', 'Talos', 'Taron', 'Thane',
-    'Theron', 'Titus', 'Tobias', 'Toran', 'Tristan', 'Tyrus', 'Ulric', 'Umar', 'Uras', 'Valen',
-    'Varen', 'Varus', 'Victor', 'Viggo', 'Viktor', 'Voran', 'Waldo', 'Warren', 'Xander', 'Xerxes',
-    'Yaron', 'Yorick', 'Yvan', 'Zael', 'Zander', 'Zephyr', 'Zoran', 'Zyler', 'Adalric', 'Alaric',
-    'Aldous', 'Alrik', 'Ambrose', 'Ansel', 'Archer', 'Arden', 'Arlen', 'Arvin', 'Auric', 'Axel',
-    'Bardric', 'Barlow', 'Baron', 'Basil', 'Baxter', 'Benedikt', 'Blaine', 'Braden', 'Brennan', 'Brock',
-    'Broderick', 'Byron', 'Cadmus', 'Camden', 'Carrick', 'Cassian', 'Cato', 'Chadwick', 'Clarence', 'Clifton',
-    'Colton', 'Conrad', 'Constantine', 'Corbin', 'Cornelius', 'Cortez', 'Cosmo', 'Crispin', 'Damian', 'Dante',
-    'Demetrius', 'Denzel', 'Desmond', 'Dexter', 'Dimitri', 'Dominic', 'Drake', 'Duncan', 'Earl', 'Edgar',
-    'Edmund', 'Edwin', 'Egon', 'Elias', 'Elliot', 'Emerson', 'Emil', 'Emmett', 'Enoch', 'Ephraim',
-    'Ernest', 'Ethan', 'Eugene', 'Evander', 'Everett', 'Fabian', 'Falcon', 'Ferdinand', 'Fletcher', 'Floyd',
-    'Foster', 'Francis', 'Franklin', 'Frederick', 'Gabriel', 'Garrison', 'Gaston', 'Geoffrey', 'Gerald', 'Gilbert',
-    'Gordon', 'Graham', 'Grant', 'Gregory', 'Griffin', 'Gunnar', 'Gustav', 'Hamilton', 'Hamish', 'Hans',
-    'Harold', 'Harrison', 'Harvey', 'Hector', 'Henry', 'Herbert', 'Herman', 'Horace', 'Howard', 'Hugo',
-    'Humphrey', 'Ian', 'Ibrahim', 'Ignatius', 'Irving', 'Isaac', 'Isidore', 'Ivan', 'Jabari', 'Jackson',
-    'Jacob', 'Jagger', 'Jamal', 'Jasper', 'Javier', 'Jerome', 'Jesse', 'Jonas', 'Jonathan', 'Jordan',
-    'Joseph', 'Joshua', 'Julian', 'Julius', 'Justin', 'Karl', 'Keiran', 'Keith', 'Kenneth', 'Kevin'
-  ],
-  
-  // MASSIVELY EXPANDED leader last names
-  leaderLastNames: [
-    'Blackwood', 'Ironforge', 'Stormborn', 'Ashbane', 'Darkwater', 'Flameheart', 'Frostblade', 'Goldmane', 'Greystone', 'Hawkeye',
-    'Ironclaw', 'Lightbringer', 'Moonwhisper', 'Nightshade', 'Oakenshield', 'Ravencrest', 'Redthorn', 'Shadowfang', 'Silverwing', 'Stargazer',
-    'Steelborn', 'Stonebreaker', 'Stormbringer', 'Suncrest', 'Swiftarrow', 'Thunderfist', 'Trueblade', 'Whitehawk', 'Wildfire', 'Winterborn',
-    'Wolfsbane', 'Brightshield', 'Bronzehammer', 'Crimsonvale', 'Deepwater', 'Duskwalker', 'Earthshaker', 'Emberstorm', 'Fireborn', 'Frostfall',
-    'Goldcrest', 'Grimward', 'Highpeak', 'Icevein', 'Ironside', 'Jadewing', 'Lionheart', 'Mithrilhand', 'Northwind', 'Obsidianedge',
-    'Peakstone', 'Quicksilver', 'Ravenwood', 'Saltshore', 'Seaborn', 'Shadowmere', 'Skybreaker', 'Snowmane', 'Starheart', 'Stonehelm',
-    'Sunderland', 'Thornwood', 'Tidecaller', 'Torchbearer', 'Valorheart', 'Voidwalker', 'Wardstone', 'Watersong', 'Windrunner', 'Wyrmstone',
-    'Ashford', 'Blackthorn', 'Bloodmoon', 'Brightblade', 'Clearwater', 'Cloudstrike', 'Coldsteel', 'Darkholm', 'Dawnbringer', 'Dragonheart',
-    'Duskwood', 'Eaglewing', 'Earthborn', 'Evermoon', 'Fairhaven', 'Fallowmere', 'Firebrand', 'Frostguard', 'Goldleaf', 'Grayhaven',
-    'Greenwood', 'Hallowbrook', 'Harbinger', 'Highborn', 'Hollowdale', 'Ironwood', 'Knightfall', 'Lightholm', 'Longstride', 'Marblehorn',
-    'Meadowbrook', 'Mistwood', 'Moonforge', 'Morningstar', 'Nightfall', 'Northstar', 'Oldoak', 'Pathfinder', 'Proudfoot', 'Quickblade',
-    'Redfield', 'Riverstone', 'Rockwood', 'Rosewood', 'Shadowbrook', 'Sharpedge', 'Silverbrook', 'Skyward', 'Snowfall', 'Southwind',
-    'Starfall', 'Stonefist', 'Stormguard', 'Strongheart', 'Sunblade', 'Swiftbrook', 'Thornfield', 'Thunderforge', 'Trueborn', 'Underwood',
-    'Valorborn', 'Waterstone', 'Westwind', 'Whitestone', 'Wildborn', 'Windstone', 'Winterforge', 'Wolfwood', 'Youngblood', 'Ashenheart',
-    'Battleborn', 'Bladestorm', 'Braveheart', 'Brightforge', 'Bronzewing', 'Castlerock', 'Copperfield', 'Crownguard', 'Crystalwind', 'Darkbane',
-    'Dawnforge', 'Deepforge', 'Diamondback', 'Driftwood', 'Duskblade', 'Eagleheart', 'Elderwood', 'Emberforge', 'Fairwind', 'Fallbrook',
-    'Fieldstone', 'Flintstrike', 'Forestborn', 'Freeborn', 'Frostborn', 'Galeforce', 'Gemheart', 'Ghostwalker', 'Gladeheart', 'Goldforge',
-    'Grandstone', 'Graveborn', 'Greatwood', 'Greywind', 'Grimforge', 'Hardstone', 'Havenbrook', 'Heartwood', 'Highforge', 'Hillborne',
-    'Holyoak', 'Hornwood', 'Iceborn', 'Ironheart', 'Jadeheart', 'Keenedge', 'Kingsbane', 'Knightwood', 'Lakeshire', 'Landfall',
-    'Lawbringer', 'Leafborn', 'Lightforge', 'Lionborn', 'Longbow', 'Lordstone', 'Lorekeeper', 'Mageborn', 'Maplebrook', 'Marshwood'
-  ],
-  
-  // MASSIVELY EXPANDED city names
-  cityNames: [
-    'Aldgate', 'Ashford', 'Avalon', 'Baelfort', 'Blackwater', 'Brightholm', 'Cairnholm', 'Castlerock', 'Clearwater', 'Coldstone',
-    'Cragmoor', 'Crossroads', 'Deepwood', 'Dragonspire', 'Duskhollow', 'Eaglecrest', 'Eastmarch', 'Eldergrove', 'Emberfall', 'Evermore',
-    'Fairhaven', 'Frostpeak', 'Goldcrest', 'Greenvale', 'Greywatch', 'Harbortown', 'Highcliff', 'Hillcrest', 'Ironforge', 'Kingshaven',
-    'Lakeshire', 'Longport', 'Meadowbrook', 'Mistfall', 'Moonhaven', 'Northgate', 'Oakridge', 'Oldtown', 'Ravenswood', 'Redcliff',
-    'Riverdale', 'Rockport', 'Rosewood', 'Saltmere', 'Shadowdale', 'Silverstone', 'Skywatch', 'Southport', 'Starfall', 'Stonebridge',
-    'Stormhaven', 'Sundale', 'Thornwood', 'Tidehaven', 'Valorkeep', 'Waterford', 'Westgate', 'Whitestone', 'Wildwood', 'Windhelm',
-    'Winterhold', 'Wolfden', 'Amberfield', 'Anchorpoint', 'Applegrove', 'Archway', 'Ashenvale', 'Azureport', 'Barrowton', 'Baybridge',
-    'Beachside', 'Bellhaven', 'Birchwood', 'Blackburn', 'Bluestone', 'Bridgeton', 'Brightwater', 'Bronzegate', 'Brookhaven', 'Burnwick',
-    'Candlewick', 'Cedarwood', 'Charbridge', 'Cherryhill', 'Cliffside', 'Cloudrest', 'Coalport', 'Cobblestone', 'Copperhill', 'Coralshore',
-    'Cornerstone', 'Crownpoint', 'Crystalbrook', 'Dawnstar', 'Deepholm', 'Deerfield', 'Diamondport', 'Driftwood', 'Dunwick', 'Eaglepoint',
-    'Eastbrook', 'Ebonhold', 'Edgewater', 'Elmwood', 'Emeraldhill', 'Fairfield', 'Fallbrook', 'Featherfall', 'Fernwood', 'Fieldstone',
-    'Firestone', 'Fishbrook', 'Flamewood', 'Fleetport', 'Flintwood', 'Fogmere', 'Forestgate', 'Freehold', 'Frostwood', 'Galeport',
-    'Gardenhill', 'Gemstone', 'Ghostwood', 'Gildedport', 'Glasswater', 'Glenwood', 'Glimmershore', 'Goldbrook', 'Goodhaven', 'Grandport',
-    'Grapehill', 'Grassmere', 'Gravewood', 'Greengate', 'Greyport', 'Grimdale', 'Gullport', 'Hallowdale', 'Hammerstone', 'Harborside',
-    'Hartwood', 'Havendale', 'Hawkstone', 'Hazelwood', 'Heartland', 'Heatherfield', 'Highgate', 'Highstone', 'Hillgate', 'Hollowheart',
-    'Honeyfield', 'Hopefield', 'Hornwood', 'Iceport', 'Irongate', 'Ironwood', 'Ivydale', 'Jadeport', 'Jewelcrest', 'Keenport',
-    'Keystone', 'Kingsbridge', 'Kingsport', 'Knightdale', 'Lakeford', 'Lakeview', 'Lamplight', 'Lanternwood', 'Larkspur', 'Leafdale',
-    'Limestone', 'Liongate', 'Lionsport', 'Lockwood', 'Lonestone', 'Lordport', 'Lotusfield', 'Luckport', 'Maplebrook', 'Marbleton',
-    'Marshgate', 'Meadowgate', 'Millbrook', 'Millstone', 'Mintwood', 'Mirrorport', 'Mistwood', 'Moonbridge', 'Moonstone', 'Moorgate',
-    'Morningdale', 'Mountaingate', 'Myrtle', 'Needlewood', 'Newbridge', 'Newgate', 'Nightbrook', 'Northbrook', 'Northstone', 'Novamere'
-  ],
-  
-  // MASSIVELY EXPANDED country/civilization types (replaces "Civilization" ending)
-  countryTypes: [
-    'Empire', 'Kingdom', 'Republic', 'Dominion', 'Federation', 'Confederacy', 'Commonwealth', 'Union', 
-    'League', 'Alliance', 'Coalition', 'Consortium', 'State', 'Nation', 'Realm', 'Domain',
-    'Principality', 'Duchy', 'Protectorate', 'Territory', 'Province', 'Hegemony', 'Dynasty', 'Imperium',
-    'Khanate', 'Sultanate', 'Emirate', 'Caliphate', 'Shogunate', 'Tsardom', 'Raj', 'Mandate',
-    'Theocracy', 'Autocracy', 'Oligarchy', 'Triumvirate', 'Directorate', 'Regency', 'Sovereignty', 'Freehold',
-    'Compact', 'Concord', 'Accord', 'Pact', 'Entente', 'Bloc', 'Council', 'Assembly',
-    'Grand Duchy', 'Archduchy', 'Viceroyalty', 'Crown', 'Throne', 'Court', 'House', 'Dynasty',
-    'Ascendancy', 'Supremacy', 'Stratocracy', 'Kritarchy', 'Synarchy', 'Technocracy', 'Meritocracy', 'Timocracy'
-  ]
-};
+function generatePlanetData(seed, progressCallback) {
+  const rng = mulberry32(seed);
+  const noise = new SimplexNoise(seed);
 
-// ============================================
-// WORLD STATE
-// ============================================
-let gameState = {
-  year: 0,
-  speed: 2, // 0=pause, 1=slow, 2=normal, 3=fast, 4=ultra
-  speedMultipliers: [0, 1, 3, 10, 30],
-  tribes: [],
-  countries: [],
-  events: [],
-  lastTick: 0
-};
+  const width = MAP_WIDTH;
+  const height = MAP_HEIGHT;
 
-// ============================================
-// HELPERS
-// ============================================
-function generateName(type = 'tribe') {
-  const prefix = worldRng.choice(NAME_POOLS.prefixes);
-  const suffix = worldRng.choice(NAME_POOLS.suffixes);
-  return prefix + suffix;
+  const data = {
+    width,
+    height,
+    elevation: new Float32Array(width * height),
+    moisture: new Float32Array(width * height),
+    temperature: new Float32Array(width * height),
+    biome: new Uint8Array(width * height),
+    river: new Uint8Array(width * height),
+    seed
+  };
+
+  const scale = 0.003;
+  const octaves = 6;
+  const persistence = 0.5;
+  const lacunarity = 2.0;
+
+  // Elevation
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let amplitude = 1.0;
+      let frequency = 1.0;
+      let value = 0;
+      for (let o = 0; o < octaves; o++) {
+        const sampleX = x * scale * frequency;
+        const sampleY = y * scale * frequency;
+        const n = noise.noise2D(sampleX, sampleY);
+        value += n * amplitude;
+        amplitude *= persistence;
+        frequency *= lacunarity;
+      }
+      const latFactor = Math.abs((y / height) - 0.5) * 2;
+      const polarPenalty = Math.pow(latFactor, 1.5) * 0.3;
+      value -= polarPenalty;
+      data.elevation[y * width + x] = value;
+    }
+    if (y % 50 === 0) {
+      const pct = (y / height) * 33;
+      progressCallback(pct, 'Generating elevation...');
+    }
+  }
+
+  // Moisture
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      let amplitude = 1.0;
+      let frequency = 1.0;
+      let value = 0;
+      for (let o = 0; o < 4; o++) {
+        const sampleX = (x + 1000) * scale * frequency;
+        const sampleY = (y + 1000) * scale * frequency;
+        const n = noise.noise2D(sampleX, sampleY);
+        value += n * amplitude;
+        amplitude *= persistence;
+        frequency *= lacunarity;
+      }
+      data.moisture[y * width + x] = value;
+    }
+    if (y % 50 === 0) {
+      const pct = 33 + (y / height) * 33;
+      progressCallback(pct, 'Generating moisture...');
+    }
+  }
+
+  // Temperature
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const latFactor = Math.abs((y / height) - 0.5) * 2;
+      const baseTemp = 1.0 - latFactor;
+      const elev = data.elevation[y * width + x];
+      const elevPenalty = Math.max(0, elev - 0.1) * 0.5;
+      let temp = baseTemp - elevPenalty;
+      const n = noise.noise2D(x * 0.01, y * 0.01) * 0.1;
+      temp += n;
+      data.temperature[y * width + x] = temp;
+    }
+    if (y % 50 === 0) {
+      const pct = 66 + (y / height) * 33;
+      progressCallback(pct, 'Generating temperature...');
+    }
+  }
+
+  // Biomes
+  const BIOME_OCEAN = 0;
+  const BIOME_COAST = 1;
+  const BIOME_DESERT = 2;
+  const BIOME_GRASSLAND = 3;
+  const BIOME_FOREST = 4;
+  const BIOME_TUNDRA = 5;
+  const BIOME_SNOW = 6;
+  const BIOME_MOUNTAIN = 7;
+
+  for (let i = 0; i < width * height; i++) {
+    const e = data.elevation[i];
+    const m = data.moisture[i];
+    const t = data.temperature[i];
+
+    if (e < -0.05) {
+      data.biome[i] = BIOME_OCEAN;
+    } else if (e < 0.0) {
+      data.biome[i] = BIOME_COAST;
+    } else if (e > 0.6) {
+      data.biome[i] = BIOME_MOUNTAIN;
+    } else if (t < 0.2) {
+      data.biome[i] = BIOME_SNOW;
+    } else if (t < 0.4) {
+      data.biome[i] = BIOME_TUNDRA;
+    } else if (m < -0.2) {
+      data.biome[i] = BIOME_DESERT;
+    } else if (m < 0.1) {
+      data.biome[i] = BIOME_GRASSLAND;
+    } else {
+      data.biome[i] = BIOME_FOREST;
+    }
+  }
+
+  progressCallback(100, 'World generated!');
+  return data;
 }
 
-function generateCivilizationName() {
-  const baseName = generateName('civilization');
-  const civType = worldRng.choice(NAME_POOLS.countryTypes);
-  return `${baseName} ${civType}`;
+function renderPlanetTexture(data) {
+  const canvas = document.createElement('canvas');
+  canvas.width = data.width;
+  canvas.height = data.height;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  const imgData = ctx.createImageData(data.width, data.height);
+
+  const colors = {
+    0: [20, 40, 80],    // ocean
+    1: [70, 90, 110],   // coast
+    2: [210, 180, 100], // desert
+    3: [100, 140, 80],  // grassland
+    4: [40, 80, 40],    // forest
+    5: [120, 120, 100], // tundra
+    6: [240, 240, 250], // snow
+    7: [100, 100, 100]  // mountain
+  };
+
+  for (let i = 0; i < data.biome.length; i++) {
+    const b = data.biome[i];
+    const c = colors[b];
+    const offset = i * 4;
+    imgData.data[offset] = c[0];
+    imgData.data[offset + 1] = c[1];
+    imgData.data[offset + 2] = c[2];
+    imgData.data[offset + 3] = 255;
+  }
+
+  ctx.putImageData(imgData, 0, 0);
+  return canvas;
 }
 
-function generateLeaderName() {
-  const first = worldRng.choice(NAME_POOLS.leaderFirstNames);
-  const last = worldRng.choice(NAME_POOLS.leaderLastNames);
-  return `${first} ${last}`;
+// ============================================
+// GAME STATE
+// ============================================
+let year = 0;
+let tribes = [];
+let countries = [];
+let events = [];
+let gameSpeed = 2;
+const speedMultipliers = [0, 1, 5, 20, 100];
+
+// EXPANSION LIMITS
+const TRIBE_MAX_TERRITORY = 25;  // Tribes can't expand beyond this many tiles
+const CIVILIZATION_TERRITORY_THRESHOLD = 50; // When a tribe becomes a civilization
+
+class Tribe {
+  constructor(x, y, id) {
+    this.id = id;
+    this.name = generateTribeName(worldRng);
+    this.x = x;
+    this.y = y;
+    this.population = 50 + Math.floor(worldRng() * 150);
+    this.territory = [{ x, y }];
+    this.color = `hsl(${Math.floor(worldRng() * 360)}, 70%, 60%)`;
+    this.growthRate = 0.02 + worldRng() * 0.03;
+  }
+
+  // FIX 4: Tribes can't expand too far
+  canExpand() {
+    return this.territory.length < TRIBE_MAX_TERRITORY;
+  }
+
+  expand() {
+    if (!this.canExpand()) return;
+    
+    const candidates = [];
+    for (const tile of this.territory) {
+      const neighbors = [
+        { x: tile.x - 1, y: tile.y },
+        { x: tile.x + 1, y: tile.y },
+        { x: tile.x, y: tile.y - 1 },
+        { x: tile.x, y: tile.y + 1 }
+      ];
+      for (const n of neighbors) {
+        if (n.x < 0 || n.x >= MAP_WIDTH || n.y < 0 || n.y >= MAP_HEIGHT) continue;
+        const idx = n.y * MAP_WIDTH + n.x;
+        const biome = planetData.biome[idx];
+        if (biome === 0) continue; // Skip ocean
+
+        // FIX 3: Check if territory is already claimed
+        const isOccupied = this.territory.some(t => t.x === n.x && t.y === n.y) ||
+                          tribes.some(tribe => tribe !== this && tribe.territory.some(t => t.x === n.x && t.y === n.y)) ||
+                          countries.some(country => country.territory.some(t => t.x === n.x && t.y === n.y));
+        
+        if (!isOccupied) {
+          candidates.push(n);
+        }
+      }
+    }
+
+    if (candidates.length > 0) {
+      const chosen = pickRandom(candidates, worldRng);
+      this.territory.push(chosen);
+    }
+  }
+
+  update() {
+    this.population *= (1 + this.growthRate);
+    if (worldRng() < 0.02 && this.canExpand()) {
+      this.expand();
+    }
+
+    // Convert to civilization if territory is large enough
+    if (this.territory.length >= CIVILIZATION_TERRITORY_THRESHOLD) {
+      this.becomeCivilization();
+    }
+  }
+
+  becomeCivilization() {
+    const civ = new Country(this.x, this.y, countries.length, this);
+    countries.push(civ);
+    addEvent(`${this.name} has formed ${civ.name}!`);
+    const idx = tribes.indexOf(this);
+    if (idx !== -1) tribes.splice(idx, 1);
+  }
 }
 
-function generateCityName() {
-  return worldRng.choice(NAME_POOLS.cityNames);
+class Country {
+  constructor(x, y, id, fromTribe = null) {
+    this.id = id;
+    if (fromTribe) {
+      // FIX 1: Use new civilization name generator instead of adding "Civilization"
+      this.name = generateCivilizationName(worldRng);
+      this.territory = [...fromTribe.territory];
+      this.population = fromTribe.population;
+      this.color = fromTribe.color;
+    } else {
+      this.name = generateCivilizationName(worldRng);
+      this.territory = [{ x, y }];
+      this.population = 500 + Math.floor(worldRng() * 1000);
+      this.color = `hsl(${Math.floor(worldRng() * 360)}, 70%, 50%)`;
+    }
+    this.capital = { x, y, name: generateCityName(worldRng) };
+    this.cities = [this.capital];
+    this.government = 'Tribal Council';
+    this.leader = {
+      name: generateLeaderName(worldRng),
+      aggression: worldRng(),
+      caution: worldRng(),
+      diplomacy: worldRng(),
+      ambition: worldRng()
+    };
+    this.growthRate = 0.03 + worldRng() * 0.04;
+  }
+
+  expand() {
+    const candidates = [];
+    for (const tile of this.territory) {
+      const neighbors = [
+        { x: tile.x - 1, y: tile.y },
+        { x: tile.x + 1, y: tile.y },
+        { x: tile.x, y: tile.y - 1 },
+        { x: tile.x, y: tile.y + 1 }
+      ];
+      for (const n of neighbors) {
+        if (n.x < 0 || n.x >= MAP_WIDTH || n.y < 0 || n.y >= MAP_HEIGHT) continue;
+        const idx = n.y * MAP_WIDTH + n.x;
+        const biome = planetData.biome[idx];
+        if (biome === 0) continue;
+
+        // FIX 3: Check if territory is already claimed
+        const isOccupied = this.territory.some(t => t.x === n.x && t.y === n.y) ||
+                          countries.some(country => country !== this && country.territory.some(t => t.x === n.x && t.y === n.y)) ||
+                          tribes.some(tribe => tribe.territory.some(t => t.x === n.x && t.y === n.y));
+        
+        if (!isOccupied) {
+          candidates.push(n);
+        }
+      }
+    }
+
+    if (candidates.length > 0) {
+      const chosen = pickRandom(candidates, worldRng);
+      this.territory.push(chosen);
+
+      // Maybe found a new city
+      if (worldRng() < 0.01 && this.cities.length < 10) {
+        const cityName = generateCityName(worldRng);
+        this.cities.push({ x: chosen.x, y: chosen.y, name: cityName });
+        addEvent(`${this.name} founded the city of ${cityName}.`);
+      }
+    }
+  }
+
+  update() {
+    this.population *= (1 + this.growthRate);
+    if (worldRng() < 0.05) {
+      this.expand();
+    }
+  }
 }
 
+function spawnInitialTribes(count) {
+  for (let i = 0; i < count; i++) {
+    let x, y, biome;
+    let attempts = 0;
+    do {
+      x = Math.floor(worldRng() * MAP_WIDTH);
+      y = Math.floor(worldRng() * MAP_HEIGHT);
+      biome = planetData.biome[y * MAP_WIDTH + x];
+      attempts++;
+    } while ((biome === 0 || biome === 7) && attempts < 100);
+
+    if (biome !== 0 && biome !== 7) {
+      const tribe = new Tribe(x, y, tribes.length);
+      tribes.push(tribe);
+    }
+  }
+  addEvent(`${tribes.length} tribes have emerged across the world.`);
+}
+
+// ============================================
+// EVENTS
+// ============================================
 function addEvent(message) {
-  gameState.events.unshift({ year: gameState.year, message });
-  if (gameState.events.length > 50) gameState.events.pop();
+  events.push({ year, message });
+  if (events.length > 100) events.shift();
   updateEventLog();
 }
 
 function updateEventLog() {
-  const el = document.getElementById('eventLog');
-  if (!el) return;
-  el.innerHTML = gameState.events.map(e => 
-    `<div class="event-item">
-      <span class="event-year">${e.year}</span>
+  const logEl = document.getElementById('eventLog');
+  logEl.innerHTML = '';
+  for (let i = events.length - 1; i >= 0; i--) {
+    const e = events[i];
+    const item = document.createElement('div');
+    item.className = 'event-item';
+    item.innerHTML = `
+      <span class="event-year">Year ${e.year}</span>
       <span class="event-message">${e.message}</span>
-    </div>`
-  ).join('');
+    `;
+    logEl.appendChild(item);
+  }
 }
 
 // ============================================
-// PLANET GENERATION
+// RENDER
 // ============================================
-async function generatePlanet(seed) {
-  worldRng = new SeededRNG(seed);
-  worldNoise = new SimplexNoise(worldRng);
-
-  const w = MAP_WIDTH, h = MAP_HEIGHT;
-  const terrainData = new Uint8Array(w * h);
-  const heightData = new Float32Array(w * h);
-
-  const updateProgress = (pct, msg) => {
-    document.getElementById('progressBar').style.width = pct + '%';
-    document.getElementById('progressText').textContent = msg;
-  };
-
-  updateProgress(0, 'Generating base terrain...');
-  await new Promise(r => setTimeout(r, 50));
-
-  // Multi-octave noise for terrain
-  for (let y = 0; y < h; y++) {
-    for (let x = 0; x < w; x++) {
-      const nx = x / w, ny = y / h;
-      let val = 0;
-      val += worldNoise.noise2D(nx * 4, ny * 4) * 1.0;
-      val += worldNoise.noise2D(nx * 8, ny * 8) * 0.5;
-      val += worldNoise.noise2D(nx * 16, ny * 16) * 0.25;
-      val /= 1.75;
-      
-      // Polar reduction
-      const latFactor = Math.abs(ny - 0.5) * 2;
-      val -= latFactor * 0.3;
-      
-      heightData[y * w + x] = val;
-      
-      // Terrain type
-      let type = 0; // water
-      if (val > 0.05) type = 1; // land
-      if (val > 0.3) type = 2; // hills
-      if (val > 0.5) type = 3; // mountains
-      if (latFactor > 0.8 && val > -0.1) type = 4; // ice
-      
-      terrainData[y * w + x] = type;
-    }
-    if (y % 128 === 0) {
-      updateProgress(10 + (y / h) * 40, 'Shaping continents...');
-      await new Promise(r => setTimeout(r, 0));
-    }
-  }
-
-  updateProgress(50, 'Adding climate zones...');
-  await new Promise(r => setTimeout(r, 50));
-
-  const climateData = new Uint8Array(w * h);
-  for (let y = 0; y < h; y++) {
-    const lat = Math.abs(y / h - 0.5) * 2;
-    for (let x = 0; x < w; x++) {
-      const moisture = worldNoise.noise2D(x / w * 3, y / h * 3);
-      let climate = 0; // temperate
-      if (lat > 0.7) climate = 3; // polar
-      else if (lat < 0.3) climate = 1; // tropical
-      else if (moisture < -0.2) climate = 2; // arid
-      climateData[y * w + x] = climate;
-    }
-    if (y % 128 === 0) {
-      updateProgress(50 + (y / h) * 20, 'Generating climate...');
-      await new Promise(r => setTimeout(r, 0));
-    }
-  }
-
-  updateProgress(70, 'Creating rivers...');
-  await new Promise(r => setTimeout(r, 50));
-
-  const rivers = [];
-  for (let i = 0; i < 20; i++) {
-    const startX = worldRng.int(0, w - 1);
-    const startY = worldRng.int(0, h - 1);
-    if (terrainData[startY * w + startX] > 2) {
-      const river = [];
-      let cx = startX, cy = startY;
-      for (let step = 0; step < 200; step++) {
-        river.push({ x: cx, y: cy });
-        if (terrainData[cy * w + cx] === 0) break;
-        
-        let lowest = heightData[cy * w + cx];
-        let nx = cx, ny = cy;
-        for (let dy = -1; dy <= 1; dy++) {
-          for (let dx = -1; dx <= 1; dx++) {
-            if (dx === 0 && dy === 0) continue;
-            const tx = (cx + dx + w) % w;
-            const ty = Math.max(0, Math.min(h - 1, cy + dy));
-            const th = heightData[ty * w + tx];
-            if (th < lowest) {
-              lowest = th;
-              nx = tx;
-              ny = ty;
-            }
-          }
-        }
-        if (nx === cx && ny === cy) break;
-        cx = nx;
-        cy = ny;
-      }
-      if (river.length > 10) rivers.push(river);
-    }
-  }
-
-  updateProgress(80, 'Rendering world...');
-  await new Promise(r => setTimeout(r, 50));
-
-  // Render to texture
-  const canvas = document.createElement('canvas');
-  canvas.width = w;
-  canvas.height = h;
-  const ctx = canvas.getContext('2d');
-  const imgData = ctx.createImageData(w, h);
-  
-  const colors = {
-    0: [30, 60, 120],     // ocean
-    1: [80, 140, 80],     // land
-    2: [110, 150, 90],    // hills
-    3: [140, 140, 140],   // mountains
-    4: [240, 250, 255]    // ice
-  };
-
-  for (let i = 0; i < terrainData.length; i++) {
-    const type = terrainData[i];
-    const [r, g, b] = colors[type];
-    imgData.data[i * 4] = r;
-    imgData.data[i * 4 + 1] = g;
-    imgData.data[i * 4 + 2] = b;
-    imgData.data[i * 4 + 3] = 255;
-  }
-  ctx.putImageData(imgData, 0, 0);
-
-  // Draw rivers
-  ctx.strokeStyle = 'rgba(50, 100, 180, 0.5)';
-  ctx.lineWidth = 1;
-  rivers.forEach(river => {
-    ctx.beginPath();
-    ctx.moveTo(river[0].x, river[0].y);
-    river.forEach(p => ctx.lineTo(p.x, p.y));
-    ctx.stroke();
-  });
-
-  basePlanetTexture = canvas;
-
-  planetData = {
-    terrain: terrainData,
-    height: heightData,
-    climate: climateData,
-    rivers,
-    width: w,
-    height: h
-  };
-
-  updateProgress(100, 'Complete!');
-  await new Promise(r => setTimeout(r, 300));
-  return planetData;
-}
-
-// ============================================
-// TRIBE SYSTEM (with expansion limits)
-// ============================================
-function initTribes() {
-  const numTribes = worldRng.int(8, 16);
-  for (let i = 0; i < numTribes; i++) {
-    spawnTribe();
-  }
-}
-
-function spawnTribe() {
-  let x, y, terrain;
-  let attempts = 0;
-  do {
-    x = worldRng.int(0, MAP_WIDTH - 1);
-    y = worldRng.int(0, MAP_HEIGHT - 1);
-    terrain = planetData.terrain[y * MAP_WIDTH + x];
-    attempts++;
-  } while ((terrain === 0 || terrain === 4) && attempts < 100);
-  
-  if (attempts >= 100) return;
-
-  const tribe = {
-    id: 'tribe_' + Date.now() + '_' + worldRng.int(0, 9999),
-    name: generateName('tribe'),
-    x, y,
-    population: worldRng.int(50, 200),
-    territories: [{ x, y }],
-    color: `hsl(${worldRng.int(0, 360)}, 70%, 60%)`,
-    age: 0,
-    lastExpansion: 0,
-    maxTerritoryBeforeCiv: 8 // LIMIT: tribes can't expand beyond 8 territories until they become civilizations
-  };
-  gameState.tribes.push(tribe);
-  addEvent(`${tribe.name} tribe emerges`);
-}
-
-function updateTribes() {
-  // Tribe logic
-  gameState.tribes.forEach(tribe => {
-    tribe.age++;
-    tribe.population += worldRng.int(-5, 15);
-    if (tribe.population < 10) tribe.population = 10;
-
-    // Expansion logic (LIMITED before civilization)
-    if (tribe.age - tribe.lastExpansion > 50 && tribe.territories.length < tribe.maxTerritoryBeforeCiv) {
-      expandTribeTerritory(tribe);
-      tribe.lastExpansion = tribe.age;
-    }
-
-    // Become civilization when conditions are met
-    if (tribe.population > 500 && tribe.age > 200 && tribe.territories.length >= 5) {
-      const civIndex = worldRng.int(0, 1000);
-      if (civIndex < 5) { // 0.5% chance per tick
-        tribeToCivilization(tribe);
-      }
-    }
-  });
-
-  // Remove dead tribes
-  gameState.tribes = gameState.tribes.filter(t => t.population > 0);
-}
-
-function expandTribeTerritory(tribe) {
-  if (tribe.territories.length === 0) return;
-  
-  // Pick random existing territory to expand from
-  const baseTerritory = worldRng.choice(tribe.territories);
-  const directions = [
-    { dx: -1, dy: 0 }, { dx: 1, dy: 0 },
-    { dx: 0, dy: -1 }, { dx: 0, dy: 1 },
-    { dx: -1, dy: -1 }, { dx: -1, dy: 1 },
-    { dx: 1, dy: -1 }, { dx: 1, dy: 1 }
-  ];
-  
-  // Shuffle directions
-  for (let i = directions.length - 1; i > 0; i--) {
-    const j = worldRng.int(0, i);
-    [directions[i], directions[j]] = [directions[j], directions[i]];
-  }
-  
-  for (const dir of directions) {
-    const newX = (baseTerritory.x + dir.dx + MAP_WIDTH) % MAP_WIDTH;
-    const newY = Math.max(0, Math.min(MAP_HEIGHT - 1, baseTerritory.y + dir.dy));
-    
-    // Check if territory is valid and not already owned
-    const terrain = planetData.terrain[newY * MAP_WIDTH + newX];
-    if (terrain === 0 || terrain === 4) continue; // skip water and ice
-    
-    // Check if already owned by this tribe
-    const alreadyOwned = tribe.territories.some(t => t.x === newX && t.y === newY);
-    if (alreadyOwned) continue;
-    
-    // CRITICAL FIX: Check if owned by ANY other tribe or country
-    const ownedByOther = isTerritoryClaimed(newX, newY, tribe.id);
-    if (ownedByOther) continue;
-    
-    // Add new territory
-    tribe.territories.push({ x: newX, y: newY });
-    return;
-  }
-}
-
-function isTerritoryClaimed(x, y, excludeId = null) {
-  // Check all tribes
-  for (const tribe of gameState.tribes) {
-    if (tribe.id === excludeId) continue;
-    if (tribe.territories.some(t => t.x === x && t.y === y)) {
-      return true;
-    }
-  }
-  
-  // Check all countries
-  for (const country of gameState.countries) {
-    if (country.id === excludeId) continue;
-    if (country.territories.some(t => t.x === x && t.y === y)) {
-      return true;
-    }
-  }
-  
-  return false;
-}
-
-function tribeToCivilization(tribe) {
-  const country = {
-    id: tribe.id, // Keep same ID
-    name: generateCivilizationName(), // NOW USES COUNTRY TYPES, NOT "Civilization"
-    x: tribe.x,
-    y: tribe.y,
-    population: tribe.population,
-    territories: [...tribe.territories],
-    color: tribe.color,
-    leader: {
-      name: generateLeaderName(),
-      age: worldRng.int(25, 60),
-      traits: {
-        aggression: worldRng.range(0, 1),
-        caution: worldRng.range(0, 1),
-        diplomacy: worldRng.range(0, 1),
-        ambition: worldRng.range(0, 1)
-      }
-    },
-    government: 'Tribal Chiefdom',
-    cities: [],
-    age: tribe.age,
-    lastExpansion: 0
-  };
-
-  // Create capital city
-  const capitalName = generateCityName();
-  country.cities.push({
-    name: capitalName,
-    x: tribe.x,
-    y: tribe.y,
-    population: Math.floor(tribe.population * 0.3),
-    isCapital: true
-  });
-
-  gameState.countries.push(country);
-  gameState.tribes = gameState.tribes.filter(t => t.id !== tribe.id);
-  
-  addEvent(`${country.name} founded by ${country.leader.name}`);
-}
-
-// ============================================
-// COUNTRY SYSTEM (unlimited expansion)
-// ============================================
-function updateCountries() {
-  gameState.countries.forEach(country => {
-    country.age++;
-    country.population += worldRng.int(10, 50);
-
-    // Countries can expand much more freely
-    if (country.age - country.lastExpansion > 30) {
-      expandCountryTerritory(country);
-      country.lastExpansion = country.age;
-    }
-
-    // Create new cities occasionally
-    if (country.population > country.cities.length * 1000 && worldRng.next() < 0.01) {
-      createCity(country);
-    }
-  });
-}
-
-function expandCountryTerritory(country) {
-  if (country.territories.length === 0) return;
-  
-  const baseTerritory = worldRng.choice(country.territories);
-  const directions = [
-    { dx: -1, dy: 0 }, { dx: 1, dy: 0 },
-    { dx: 0, dy: -1 }, { dx: 0, dy: 1 },
-    { dx: -1, dy: -1 }, { dx: -1, dy: 1 },
-    { dx: 1, dy: -1 }, { dx: 1, dy: 1 }
-  ];
-  
-  for (let i = directions.length - 1; i > 0; i--) {
-    const j = worldRng.int(0, i);
-    [directions[i], directions[j]] = [directions[j], directions[i]];
-  }
-  
-  for (const dir of directions) {
-    const newX = (baseTerritory.x + dir.dx + MAP_WIDTH) % MAP_WIDTH;
-    const newY = Math.max(0, Math.min(MAP_HEIGHT - 1, baseTerritory.y + dir.dy));
-    
-    const terrain = planetData.terrain[newY * MAP_WIDTH + newX];
-    if (terrain === 0 || terrain === 4) continue;
-    
-    const alreadyOwned = country.territories.some(t => t.x === newX && t.y === newY);
-    if (alreadyOwned) continue;
-    
-    // CRITICAL FIX: Check if owned by ANY other entity
-    const ownedByOther = isTerritoryClaimed(newX, newY, country.id);
-    if (ownedByOther) continue;
-    
-    country.territories.push({ x: newX, y: newY });
-    return;
-  }
-}
-
-function createCity(country) {
-  // Find territory without a city
-  const availableTerritories = country.territories.filter(t => 
-    !country.cities.some(c => c.x === t.x && c.y === t.y)
-  );
-  
-  if (availableTerritories.length === 0) return;
-  
-  const location = worldRng.choice(availableTerritories);
-  const cityName = generateCityName();
-  
-  country.cities.push({
-    name: cityName,
-    x: location.x,
-    y: location.y,
-    population: worldRng.int(100, 500),
-    isCapital: false
-  });
-  
-  addEvent(`${cityName} founded in ${country.name}`);
-}
-
-// ============================================
-// RENDERING
-// ============================================
-function renderWorld() {
-  if (!basePlanetTexture || !planetData) return;
+function drawMap() {
+  if (!basePlanetTexture) return;
 
   const cw = mapCanvas.width;
   const ch = mapCanvas.height;
-  
-  mapCtx.fillStyle = '#000510';
-  mapCtx.fillRect(0, 0, cw, ch);
-
-  const scale = Math.min(cw / MAP_WIDTH, ch / MAP_HEIGHT) * camera.zoom;
-  const offsetX = cw / 2 - (MAP_WIDTH / 2) * scale - camera.x * scale;
-  const offsetY = ch / 2 - (MAP_HEIGHT / 2) * scale - camera.y * scale;
 
   mapCtx.save();
-  mapCtx.translate(offsetX, offsetY);
-  mapCtx.scale(scale, scale);
-  
-  // Draw base planet
-  mapCtx.drawImage(basePlanetTexture, 0, 0);
-  
-  // Draw territories for tribes
-  gameState.tribes.forEach(tribe => {
-    mapCtx.fillStyle = tribe.color + '40';
-    mapCtx.strokeStyle = tribe.color;
-    mapCtx.lineWidth = 1 / scale;
-    
-    tribe.territories.forEach(t => {
-      mapCtx.fillRect(t.x, t.y, 1, 1);
-      mapCtx.strokeRect(t.x, t.y, 1, 1);
-    });
-    
-    // Tribe marker
-    mapCtx.fillStyle = tribe.color;
-    mapCtx.fillRect(tribe.x - 2, tribe.y - 2, 4, 4);
-  });
-  
-  // Draw territories for countries
-  gameState.countries.forEach(country => {
-    mapCtx.fillStyle = country.color + '60';
-    mapCtx.strokeStyle = country.color;
-    mapCtx.lineWidth = 1 / scale;
-    
-    country.territories.forEach(t => {
-      mapCtx.fillRect(t.x, t.y, 1, 1);
-      mapCtx.strokeRect(t.x, t.y, 1, 1);
-    });
-    
-    // City markers
-    country.cities.forEach(city => {
-      mapCtx.fillStyle = city.isCapital ? '#FFD700' : '#FFFFFF';
-      const size = city.isCapital ? 6 : 4;
-      mapCtx.fillRect(city.x - size/2, city.y - size/2, size, size);
-    });
-  });
-  
+  mapCtx.setTransform(1, 0, 0, 1, 0, 0);
+  mapCtx.clearRect(0, 0, cw, ch);
   mapCtx.restore();
-  
-  // Update UI
-  const statsEl = document.getElementById('worldStats');
-  if (statsEl) {
-    statsEl.textContent = `Year ${gameState.year} | Tribes: ${gameState.tribes.length} | Countries: ${gameState.countries.length}`;
+
+  mapCtx.save();
+  mapCtx.translate(-camera.x, -camera.y);
+  mapCtx.scale(camera.zoom, camera.zoom);
+  mapCtx.drawImage(basePlanetTexture, 0, 0, MAP_WIDTH, MAP_HEIGHT);
+  mapCtx.restore();
+
+  overlayCtx.clearRect(0, 0, MAP_WIDTH, MAP_HEIGHT);
+
+  // Draw tribe territories
+  for (const tribe of tribes) {
+    overlayCtx.fillStyle = tribe.color + '80';
+    for (const tile of tribe.territory) {
+      overlayCtx.fillRect(tile.x, tile.y, 1, 1);
+    }
   }
+
+  // Draw country territories
+  for (const country of countries) {
+    overlayCtx.fillStyle = country.color + '80';
+    for (const tile of country.territory) {
+      overlayCtx.fillRect(tile.x, tile.y, 1, 1);
+    }
+  }
+
+  // Draw cities
+  overlayCtx.fillStyle = '#ffffff';
+  for (const country of countries) {
+    for (const city of country.cities) {
+      overlayCtx.fillRect(city.x - 1, city.y - 1, 3, 3);
+    }
+  }
+
+  mapCtx.save();
+  mapCtx.translate(-camera.x, -camera.y);
+  mapCtx.scale(camera.zoom, camera.zoom);
+  mapCtx.drawImage(overlayCanvas, 0, 0);
+  mapCtx.restore();
 }
 
-function resizeCanvas() {
-  mapCanvas.width = window.innerWidth;
-  mapCanvas.height = window.innerHeight;
-  overlayCanvas.width = window.innerWidth;
-  overlayCanvas.height = window.innerHeight;
-}
-
-// ============================================
-// CAMERA CONTROLS
-// ============================================
 function updateCamera() {
-  const moveSpeed = camera.moveSpeed / camera.zoom;
-  
-  if (keys.w || keys.ArrowUp) camera.y -= moveSpeed;
-  if (keys.s || keys.ArrowDown) camera.y += moveSpeed;
-  if (keys.a || keys.ArrowLeft) camera.x -= moveSpeed;
-  if (keys.d || keys.ArrowRight) camera.x += moveSpeed;
-  
-  // Smooth zoom
-  camera.zoom += (camera.targetZoom - camera.zoom) * 0.1;
+  const speed = camera.moveSpeed / camera.zoom;
+  if (keys.w || keys.ArrowUp) camera.y -= speed;
+  if (keys.s || keys.ArrowDown) camera.y += speed;
+  if (keys.a || keys.ArrowLeft) camera.x -= speed;
+  if (keys.d || keys.ArrowRight) camera.x += speed;
+
+  const zoomSpeed = 0.05;
+  if (camera.zoom !== camera.targetZoom) {
+    const diff = camera.targetZoom - camera.zoom;
+    camera.zoom += diff * zoomSpeed;
+    if (Math.abs(diff) < 0.001) camera.zoom = camera.targetZoom;
+  }
+
+  const maxX = MAP_WIDTH * camera.zoom - mapCanvas.width;
+  const maxY = MAP_HEIGHT * camera.zoom - mapCanvas.height;
+  camera.x = Math.max(0, Math.min(camera.x, maxX));
+  camera.y = Math.max(0, Math.min(camera.y, maxY));
 }
 
 // ============================================
-// GAME LOOP
+// UPDATE LOOP
 // ============================================
-function gameLoop(timestamp) {
-  const delta = timestamp - gameState.lastTick;
-  
-  if (gameState.speed > 0 && delta >= 100 / gameState.speedMultipliers[gameState.speed]) {
-    gameState.year += 1;
-    updateTribes();
-    updateCountries();
-    gameState.lastTick = timestamp;
+let lastUpdate = Date.now();
+const updateInterval = 100;
+
+function gameLoop() {
+  const now = Date.now();
+  const delta = now - lastUpdate;
+
+  if (delta >= updateInterval) {
+    lastUpdate = now;
+    const ticks = speedMultipliers[gameSpeed];
+    for (let i = 0; i < ticks; i++) {
+      year++;
+      for (const tribe of tribes) tribe.update();
+      for (const country of countries) country.update();
+    }
+    updateUI();
   }
-  
+
   updateCamera();
-  renderWorld();
-  
+  drawMap();
   requestAnimationFrame(gameLoop);
 }
 
+function updateUI() {
+  document.getElementById('worldStats').textContent =
+    `Year ${year} | Tribes: ${tribes.length} | Countries: ${countries.length}`;
+}
+
 // ============================================
-// EVENT HANDLERS
+// INPUT
 // ============================================
 document.addEventListener('keydown', (e) => {
   if (e.key in keys) {
@@ -852,17 +841,76 @@ mapCanvas.addEventListener('wheel', (e) => {
   camera.targetZoom = Math.max(camera.minZoom, Math.min(camera.maxZoom, camera.targetZoom * zoomFactor));
 });
 
-// Time controls
+mapCanvas.addEventListener('click', (e) => {
+  const rect = mapCanvas.getBoundingClientRect();
+  const canvasX = e.clientX - rect.left;
+  const canvasY = e.clientY - rect.top;
+  const worldX = Math.floor((canvasX + camera.x) / camera.zoom);
+  const worldY = Math.floor((canvasY + camera.y) / camera.zoom);
+
+  let foundTribe = null;
+  for (const tribe of tribes) {
+    if (tribe.territory.some(t => t.x === worldX && t.y === worldY)) {
+      foundTribe = tribe;
+      break;
+    }
+  }
+
+  let foundCountry = null;
+  for (const country of countries) {
+    if (country.territory.some(t => t.x === worldX && t.y === worldY)) {
+      foundCountry = country;
+      break;
+    }
+  }
+
+  const infoPanel = document.getElementById('infoPanel');
+  const infoPanelTitle = document.getElementById('infoPanelTitle');
+  const infoPanelContent = document.getElementById('infoPanelContent');
+
+  if (foundCountry) {
+    infoPanelTitle.textContent = foundCountry.name;
+    infoPanelContent.innerHTML = `
+      <div class="info-row"><span class="info-label">Leader:</span><span class="info-value">${foundCountry.leader.name}</span></div>
+      <div class="info-row"><span class="info-label">Government:</span><span class="info-value">${foundCountry.government}</span></div>
+      <div class="info-row"><span class="info-label">Population:</span><span class="info-value">${Math.floor(foundCountry.population).toLocaleString()}</span></div>
+      <div class="info-row"><span class="info-label">Territory:</span><span class="info-value">${foundCountry.territory.length} tiles</span></div>
+      <div class="info-row"><span class="info-label">Cities:</span><span class="info-value">${foundCountry.cities.length}</span></div>
+      <div class="info-row"><span class="info-label">Capital:</span><span class="info-value">${foundCountry.capital.name}</span></div>
+    `;
+    infoPanel.style.display = 'block';
+  } else if (foundTribe) {
+    infoPanelTitle.textContent = foundTribe.name;
+    infoPanelContent.innerHTML = `
+      <div class="info-row"><span class="info-label">Type:</span><span class="info-value">Tribe</span></div>
+      <div class="info-row"><span class="info-label">Population:</span><span class="info-value">${Math.floor(foundTribe.population).toLocaleString()}</span></div>
+      <div class="info-row"><span class="info-label">Territory:</span><span class="info-value">${foundTribe.territory.length} tiles</span></div>
+      <div class="info-row"><span class="info-label">Max Territory:</span><span class="info-value">${TRIBE_MAX_TERRITORY} tiles</span></div>
+    `;
+    infoPanel.style.display = 'block';
+  } else {
+    infoPanel.style.display = 'none';
+  }
+});
+
+document.getElementById('closeInfoPanel').addEventListener('click', () => {
+  document.getElementById('infoPanel').style.display = 'none';
+});
+
+// ============================================
+// TIME CONTROLS
+// ============================================
 document.querySelectorAll('.time-btn').forEach(btn => {
   btn.addEventListener('click', () => {
-    const speed = parseInt(btn.dataset.speed);
-    gameState.speed = speed;
+    gameSpeed = parseInt(btn.dataset.speed);
     document.querySelectorAll('.time-btn').forEach(b => b.classList.remove('active'));
     btn.classList.add('active');
   });
 });
 
-// Settings
+// ============================================
+// SETTINGS
+// ============================================
 document.getElementById('settingsBtn').addEventListener('click', () => {
   document.getElementById('settingsPanel').style.display = 'flex';
 });
@@ -877,18 +925,42 @@ document.getElementById('closeSettings').addEventListener('click', () => {
 document.getElementById('playBtn').addEventListener('click', async () => {
   document.getElementById('mainMenu').style.display = 'none';
   document.getElementById('gameView').style.display = 'block';
-  
-  resizeCanvas();
-  window.addEventListener('resize', resizeCanvas);
-  
+
   const seed = Date.now();
-  await generatePlanet(seed);
-  
+  worldRng = mulberry32(seed);
+  worldNoise = new SimplexNoise(seed);
+
+  planetData = await new Promise((resolve) => {
+    setTimeout(() => {
+      const data = generatePlanetData(seed, (pct, msg) => {
+        document.getElementById('progressBar').style.width = pct + '%';
+        document.getElementById('progressText').textContent = msg;
+      });
+      resolve(data);
+    }, 100);
+  });
+
+  basePlanetTexture = renderPlanetTexture(planetData);
+
+  mapCanvas.width = window.innerWidth;
+  mapCanvas.height = window.innerHeight;
+  overlayCanvas.width = MAP_WIDTH;
+  overlayCanvas.height = MAP_HEIGHT;
+
+  camera.x = 0;
+  camera.y = 0;
+  camera.zoom = Math.min(window.innerWidth / MAP_WIDTH, window.innerHeight / MAP_HEIGHT);
+  camera.targetZoom = camera.zoom;
+
+  spawnInitialTribes(20);
+
   document.getElementById('progressUI').classList.add('hidden');
   document.getElementById('gameUI').style.display = 'block';
-  
-  initTribes();
-  
-  gameState.lastTick = performance.now();
-  requestAnimationFrame(gameLoop);
+
+  gameLoop();
+});
+
+window.addEventListener('resize', () => {
+  mapCanvas.width = window.innerWidth;
+  mapCanvas.height = window.innerHeight;
 });
