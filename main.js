@@ -159,12 +159,22 @@ function generateColor(rng) {
 }
 
 function generateLeader(rng) {
-  const firstNames = ['Aldric', 'Bjorn', 'Casimir', 'Darius', 'Eamon', 'Falk', 'Gorin', 'Harald', 'Ivar', 'Joran', 'Kael', 'Leif', 'Magnus', 'Niko', 'Orin', 'Pavel', 'Ragnor', 'Sven', 'Thrain', 'Ulric', 'Viktor', 'Wulfric', 'Xerxes', 'Yorick', 'Zoran'];
-  const titles = ['the Bold', 'the Wise', 'the Great', 'the Fierce', 'the Just', 'the Cunning', 'the Strong', 'the Fair'];
-  
+  const firstNames = [
+    'Aldric','Bjorn','Casimir','Darius','Eamon','Falk','Gorin','Harald','Ivar','Joran',
+    'Kael','Leif','Magnus','Niko','Orin','Pavel','Ragnor','Sven','Thrain','Ulric',
+    'Viktor','Wulfric','Xerxes','Yorick','Zoran','Amara','Brina','Celene','Dalia','Elara',
+    'Faelan','Galen','Helia','Isolde','Jun','Kira','Liora','Marek','Nessa','Oren',
+    'Priya','Quin','Riva','Selim','Tova','Ulan','Vera','Wen','Xan','Yara','Zina'
+  ];
+  const titles = [
+    'the Bold','the Wise','the Great','the Fierce','the Just','the Cunning','the Strong',
+    'the Fair','the Resolute','the Serene','the Iron','the Traveller','the Builder',
+    'the Lion','the Beacon','the Stern','the Benevolent','the Swift'
+  ];
+
   const firstName = firstNames[Math.floor(rng.next() * firstNames.length)];
   const title = rng.next() > 0.6 ? ' ' + titles[Math.floor(rng.next() * titles.length)] : '';
-  
+
   const traits = {
     aggression: rng.next(),
     diplomacy: rng.next(),
@@ -173,46 +183,74 @@ function generateLeader(rng) {
     freedom: rng.next(),
     rationality: rng.next()
   };
-  
+
   return new Leader(firstName + title, traits);
 }
 
 function generateTribalLeader(rng) {
-  const tribalNames = ['Atok', 'Bram', 'Crag', 'Durn', 'Eron', 'Fenn', 'Grok', 'Hrok', 'Jarn', 'Korg', 'Loth', 'Murn', 'Norg', 'Olf', 'Rok', 'Skar', 'Thok', 'Ulf', 'Vorn', 'Wrek'];
+  const tribalNames = [
+    'Atok','Bram','Crag','Durn','Eron','Fenn','Grok','Hrok','Jarn','Korg',
+    'Loth','Murn','Norg','Olf','Rok','Skar','Thok','Ulf','Vorn','Wrek',
+    'Asha','Bela','Ciri','Danu','Esha','Fara','Gala','Hira','Isha','Jala',
+    'Ketu','Luma','Miri','Nalu','Onna','Pera','Roka','Sula','Tara','Vela'
+  ];
   const name = tribalNames[Math.floor(rng.next() * tribalNames.length)];
-  
-  // Generate personality with more variety
+
   const traits = {
-    aggression: rng.next(),      // 0-1: peaceful to warlike
-    diplomacy: rng.next(),        // 0-1: hostile to friendly
-    ambition: rng.next(),         // 0-1: content to expansionist
-    caution: rng.next(),          // 0-1: reckless to cautious
-    freedom: rng.next(),          // 0-1: authoritarian to libertarian
-    rationality: rng.next()       // 0-1: emotional to logical
+    aggression: rng.next(),
+    diplomacy: rng.next(),
+    ambition: rng.next(),
+    caution: rng.next(),
+    freedom: rng.next(),
+    rationality: rng.next()
   };
-  
+
   return new Leader(name, traits);
 }
 
 function generateCultureName(rng) {
-  const prefixes = ['Aka', 'Uru', 'Zul', 'Mor', 'Tek', 'Nal', 'Kra', 'Vec', 'Dro', 'Fen'];
-  const suffixes = ['ni', 'ka', 'tu', 'ma', 'ri', 'lo', 'sa', 'nu', 'ta', 'ko'];
-  const prefix = prefixes[Math.floor(rng.next() * prefixes.length)];
-  const suffix = suffixes[Math.floor(rng.next() * suffixes.length)];
-  return prefix + suffix;
+  const prefixes = [
+    'Aka','Uru','Zul','Mor','Tek','Nal','Kra','Vec','Dro','Fen',
+    'Salo','Hara','Teno','Yari','Moku','Bari','Ralo','Ishi','Osha','Kuni',
+    'Luma','Arin','Vasa','Tora','Gala','Seru','Nira','Koro','Pema','Zera'
+  ];
+  const middles = ['an','el','ar','un','or','en','il','is','ur','am'];
+  const suffixes = [
+    'ni','ka','tu','ma','ri','lo','sa','nu','ta','ko',
+    'sha','dar','vyn','goth','dun','heim','grad','stan','mere','wyn'
+  ];
+
+  const pattern = Math.floor(rng.next() * 3);
+  if (pattern === 0) {
+    return prefixes[Math.floor(rng.next() * prefixes.length)] +
+           suffixes[Math.floor(rng.next() * suffixes.length)];
+  } else if (pattern === 1) {
+    return prefixes[Math.floor(rng.next() * prefixes.length)] +
+           middles[Math.floor(rng.next() * middles.length)] +
+           suffixes[Math.floor(rng.next() * suffixes.length)];
+  } else {
+    // Two-part name
+    const a = prefixes[Math.floor(rng.next() * prefixes.length)];
+    const b = prefixes[Math.floor(rng.next() * prefixes.length)];
+    return a + (rng.next() > 0.5 ? '-' : '') + b;
+  }
 }
 
 const planetPrefixes = [
-  'Terra', 'Gaia', 'Kepler', 'Proxima', 'Trappist', 'Nova', 'Aurora', 'Celestia',
-  'Olympus', 'Elysium', 'Arcadia', 'Avalon', 'Eden', 'Valhalla', 'Asgard', 'Midgard',
-  'Atlantis', 'Thera', 'Harmonia', 'Concordia', 'Serenity', 'Tranquility', 'Verdant',
-  'Emerald', 'Sapphire', 'Azure', 'Crimson', 'Golden', 'Silver', 'Crystal'
+  'Terra','Gaia','Kepler','Proxima','Trappist','Nova','Aurora','Celestia',
+  'Olympus','Elysium','Arcadia','Avalon','Eden','Valhalla','Asgard','Midgard',
+  'Atlantis','Thera','Harmonia','Concordia','Serenity','Tranquility','Verdant',
+  'Emerald','Sapphire','Azure','Crimson','Golden','Silver','Crystal','Lumen',
+  'Obsidian','Cinder','Solace','Boreal','Zephyr','Nightingale','Orenda','Marin',
+  'Solis','Noctis','Astra','Helios','Vesper','Nimue','Erebus','Lyra','Cassia'
 ];
 
 const planetSuffixes = [
-  'Prime', 'Major', 'Minor', 'Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon',
-  'Centauri', 'Draconis', 'Aquarii', 'Orionis', 'Lyrae', 'Cygni', 'Phoenicis',
-  'Novus', 'Secundus', 'Tertius', 'Quartus', 'Quintus'
+  'Prime','Major','Minor','Alpha','Beta','Gamma','Delta','Epsilon',
+  'Centauri','Draconis','Aquarii','Orionis','Lyrae','Cygni','Phoenicis',
+  'Novus','Secundus','Tertius','Quartus','Quintus','Origin','Haven','Reach',
+  'Hold','Range','Shore','Vale','Isle','Sphere','Domain','Sector','Field',
+  'Frontier','Beacon','Point','Rift','Hollow'
 ];
 
 function generatePlanetName(rng) {
@@ -897,113 +935,134 @@ function simulateTick(tiles) {
 
 function migrateTribe(tribe, tiles) {
   const currentTile = getTileAt(tiles, tribe.x, tribe.y);
-  
-  // Find best neighboring tile
+
   const neighbors = [];
   const checkRadius = 2;
-  
+
   for (let dy = -checkRadius; dy <= checkRadius; dy++) {
     for (let dx = -checkRadius; dx <= checkRadius; dx++) {
       if (dx === 0 && dy === 0) continue;
-      
+
       const nx = (tribe.x + dx + TILE_WIDTH) % TILE_WIDTH;
       const ny = tribe.y + dy;
-      
       if (ny < 0 || ny >= TILE_HEIGHT) continue;
-      
+
       const tile = getTileAt(tiles, nx, ny);
-      
       if (!tile.isLand) continue;
-      
-      // Check if already occupied by another tribe
-      const isOccupied = gameState.tribes.some(t => 
+
+      // Check if already occupied by another tribe OR a country
+      const occupiedByTribe = gameState.tribes.some(t =>
         t.id !== tribe.id && t.territories.some(terr => terr.x === nx && terr.y === ny)
       );
-      
-      if (isOccupied) continue; // Can't spawn in occupied territory
-      
-      // Score this tile
+      const occupiedByCountry = gameState.countries.some(c =>
+        c.territories.some(terr => terr.x === nx && terr.y === ny)
+      );
+      if (occupiedByTribe || occupiedByCountry) continue;
+
+      // Score tile (same as before)
       let score = tile.habitability * 100;
-      
-      // Prefer rivers
       if (tile.riverPresence === 'major') score += 50;
       else if (tile.riverPresence === 'minor') score += 25;
-      
-      // Prefer coasts
       if (tile.distanceToCoast < 2) score += 30;
-      
-      // Avoid bad biomes
       if (tile.biomeType === 'desert') score -= 40;
       if (tile.biomeType === 'ice' || tile.biomeType === 'tundra') score -= 60;
-      
-      // Avoid mountains
       if (tile.roughness > 0.5) score -= 30;
-      
+
       neighbors.push({ tile, x: nx, y: ny, score });
     }
   }
-  
+
   if (neighbors.length === 0) return;
-  
-  // Sort by score
+
   neighbors.sort((a, b) => b.score - a.score);
-  
-  // Leader personality affects choice
+
   let choice;
-  
-  // REALLY TINY chance (2%) of making a terrible decision (low rationality leaders)
   if (tribe.leader.traits.rationality < 0.3 && worldRng.next() < 0.02) {
-    // Pick one of the WORST options 😂
     const worstIndex = Math.max(0, neighbors.length - 1 - Math.floor(worldRng.next() * 3));
     choice = neighbors[worstIndex];
-    
     if (worldRng.next() < 0.3) {
-      logEvent('migration', `${tribe.culture} tribe made a questionable decision under ${tribe.leader.name}...`);
+      logEvent('migration', `${tribe.culture} tribe made a questionable decision under ${tribe.leader.name}.`);
     }
   } else {
-    // Normal behavior: pick from top choices with some randomness
     const rationality = tribe.leader.traits.rationality;
-    const topChoices = Math.max(1, Math.floor((1 - rationality) * 5) + 1); // Less rational = more random
+    const topChoices = Math.max(1, Math.floor((1 - rationality) * 5) + 1);
     choice = neighbors[Math.floor(worldRng.next() * Math.min(topChoices, neighbors.length))];
   }
-  
-  // Move tribe
+
   tribe.x = choice.x;
   tribe.y = choice.y;
   tribe.territories = [{ x: choice.x, y: choice.y }];
-  tribe.migrationCooldown = Math.floor(worldRng.range(15, 35)); // Stay for a while (reduced from 10-30)
+  tribe.migrationCooldown = Math.floor(worldRng.range(15, 35));
   tribe.settlementYears = 0;
-  
+
   if (worldRng.next() < 0.05) {
     logEvent('migration', `${tribe.culture} tribe migrated to new lands.`);
   }
 }
 
+function generateCountryName(rng, tribe) {
+  // patterns: "<Culture> Kingdom", "Kingdom of <Culture>", "<Culture> Empire", "<Culture> Union", "<Culture>"
+  const patterns = [
+    '%% SIMPLE %%',          // just culture name
+    '%% KINGDOM %%',         // "<Culture> Kingdom"
+    'KINGDOM OF %%',         // "Kingdom of <Culture>"
+    '%% EMPIRE %%',          // "<Culture> Empire"
+    '%% CONFEDERATION %%',   // "<Culture> Confederation"
+    '%% UNION %%',           // "<Culture> Union"
+    'The %% Collective'      // "The <Culture> Collective"
+  ];
+  const culture = tribe.culture;
+  const choice = patterns[Math.floor(rng.next() * patterns.length)];
+  switch (choice) {
+    case '%% SIMPLE %%': return culture;
+    case '%% KINGDOM %%': return `${culture} Kingdom`;
+    case 'KINGDOM OF %%': return `Kingdom of ${culture}`;
+    case '%% EMPIRE %%': return `${culture} Empire`;
+    case '%% CONFEDERATION %%': return `${culture} Confederation`;
+    case '%% UNION %%': return `${culture} Union`;
+    default: return `The ${culture} Collective`;
+  }
+}
+
 function formCivilization(tribe, tiles) {
-  const civName = tribe.culture + ' Civilization';
+  const civName = generateCountryName(worldRng, tribe);
   const country = new Country(
-    Date.now() + Math.random(), // Unique ID
+    Date.now() + Math.random(),
     civName,
     tribe.x,
     tribe.y,
     tribe.color,
     worldRng
   );
-  
+
   country.population = tribe.population;
   country.territories = [...tribe.territories];
   country.techLevel = tribe.techLevel;
   country.government = 'tribal_confederation';
-  country.leader = tribe.leader; // Transfer the leader
-  
+  country.leader = tribe.leader;
+
   gameState.countries.push(country);
   logEvent('civilization', `${civName} has formed under ${tribe.leader.name}!`);
 }
 
 function expandTerritory(entity, tiles, entityType) {
-  // Find neighboring unclaimed tiles
+  // For tribes: impose a soft cap so tribes can't balloon into giant territories
+  if (entityType === 'tribe') {
+    const maxTerritories = 6 + Math.floor((entity.techLevel || 0) * 2);
+    if (entity.territories.length >= maxTerritories) {
+      // Optional: small chance to trigger state formation instead of expanding further
+      if (entity.leader && entity.leader.traits && worldRng.next() < 0.04 * (entity.leader.traits.ambition || 0.5)) {
+        // try to form a civ if conditions are right (caller handles removal of tribe)
+        if (entity.territories.length > 3 && entity.population > 300) {
+          formCivilization(entity, tiles);
+        }
+      }
+      return;
+    }
+  }
+
   const newTerritories = [];
-  
+
   for (const terr of entity.territories) {
     const neighbors = [
       { x: (terr.x - 1 + TILE_WIDTH) % TILE_WIDTH, y: terr.y },
@@ -1011,38 +1070,41 @@ function expandTerritory(entity, tiles, entityType) {
       { x: terr.x, y: Math.max(0, terr.y - 1) },
       { x: terr.x, y: Math.min(TILE_HEIGHT - 1, terr.y + 1) }
     ];
-    
+
     for (const n of neighbors) {
       const tile = getTileAt(tiles, n.x, n.y);
-      
       if (!tile.isLand) continue;
-      
-      // Check if already claimed
+
+      // Skip if already owned by this entity
       const alreadyClaimed = entity.territories.some(t => t.x === n.x && t.y === n.y);
       if (alreadyClaimed) continue;
-      
-      // Check if claimed by another entity
+
+      // Check if claimed by ANY other tribe OR country (exclude self)
       let claimedByOther = false;
-      if (entityType === 'country') {
-        claimedByOther = gameState.countries.some(c => 
-          c.id !== entity.id && c.territories.some(t => t.x === n.x && t.y === n.y)
-        );
-      } else {
-        claimedByOther = gameState.tribes.some(tr => 
-          tr.id !== entity.id && tr.territories.some(t => t.x === n.x && t.y === n.y)
+      // check countries
+      claimedByOther = gameState.countries.some(c =>
+        c.id !== (entity.id) && c.territories.some(t => t.x === n.x && t.y === n.y)
+      );
+      // check tribes (only if not already found)
+      if (!claimedByOther) {
+        claimedByOther = gameState.tribes.some(tr =>
+          tr.id !== (entity.id) && tr.territories.some(t => t.x === n.x && t.y === n.y)
         );
       }
-      
       if (claimedByOther) continue;
-      
-      // Expand if habitable
+
+      // Expand if habitable (same as before, but we won't steal claims)
       if (tile.habitability > 0.3 && worldRng.next() < 0.3) {
         newTerritories.push({ x: n.x, y: n.y });
       }
     }
   }
-  
-  entity.territories.push(...newTerritories);
+
+  // Avoid taking an absurdly large number of tiles at once: limit to a few per call
+  const limit = Math.max(1, Math.min(4, Math.floor(newTerritories.length / 2)));
+  for (let i = 0; i < Math.min(limit, newTerritories.length); i++) {
+    entity.territories.push(newTerritories[i]);
+  }
 }
 
 function tribalConflict(tribe, tiles) {
