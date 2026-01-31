@@ -15,11 +15,19 @@ const camera = {
   targetZoom: 1.0,
   minZoom: 0.5,
   maxZoom: 4.0,
-  isDragging: false,
-  dragStartX: 0,
-  dragStartY: 0,
-  dragStartCamX: 0,
-  dragStartCamY: 0
+  moveSpeed: 20 // pixels per frame
+};
+
+// Keyboard state
+const keys = {
+  w: false,
+  a: false,
+  s: false,
+  d: false,
+  ArrowUp: false,
+  ArrowLeft: false,
+  ArrowDown: false,
+  ArrowRight: false
 };
 
 let planetData = null;
@@ -142,8 +150,8 @@ class Leader {
 
 function generateColor(rng) {
   const hue = Math.floor(rng.next() * 360);
-  const sat = Math.floor(rng.range(40, 80));
-  const light = Math.floor(rng.range(35, 60));
+  const sat = Math.floor(rng.range(50, 85));
+  const light = Math.floor(rng.range(40, 65));
   return `hsl(${hue}, ${sat}%, ${light}%)`;
 }
 
@@ -847,10 +855,8 @@ function simulateTick(tiles) {
   // Update UI
   updateGameUI();
   
-  // Render overlay every few ticks
-  if (gameState.year % 2 === 0) {
-    renderOverlay();
-  }
+  // Render overlay every tick for smooth visualization
+  renderOverlay();
 }
 
 function migrateTribe(tribe, tiles) {
@@ -1487,9 +1493,9 @@ function renderOverlay() {
   const pixelsPerTileX = MAP_WIDTH / TILE_WIDTH;
   const pixelsPerTileY = MAP_HEIGHT / TILE_HEIGHT;
   
-  // Draw country territories
+  // Draw country territories with fill
   for (const country of gameState.countries) {
-    overlayCtx.fillStyle = country.color + '40'; // Semi-transparent
+    overlayCtx.fillStyle = country.color + '55'; // More visible semi-transparent
     
     for (const terr of country.territories) {
       const px = terr.x * pixelsPerTileX;
@@ -1498,10 +1504,10 @@ function renderOverlay() {
     }
   }
   
-  // Draw tribe territories
+  // Draw tribe territories with fill
   for (const tribe of gameState.tribes) {
-    if (tribe.settled) {
-      overlayCtx.fillStyle = tribe.color + '30';
+    if (tribe.settled && tribe.territories.length > 0) {
+      overlayCtx.fillStyle = tribe.color + '45'; // More visible semi-transparent
       
       for (const terr of tribe.territories) {
         const px = terr.x * pixelsPerTileX;
@@ -1511,11 +1517,11 @@ function renderOverlay() {
     }
   }
   
-  // Draw borders
-  overlayCtx.lineWidth = 2;
+  // Draw country borders (thicker and more visible)
+  overlayCtx.lineWidth = 3;
   
   for (const country of gameState.countries) {
-    overlayCtx.strokeStyle = country.color + 'CC';
+    overlayCtx.strokeStyle = country.color;
     
     for (const terr of country.territories) {
       const px = terr.x * pixelsPerTileX;
@@ -1557,12 +1563,59 @@ function renderOverlay() {
     }
   }
   
+  // Draw tribe borders (slightly thinner)
+  overlayCtx.lineWidth = 2;
+  
+  for (const tribe of gameState.tribes) {
+    if (tribe.settled && tribe.territories.length > 0) {
+      overlayCtx.strokeStyle = tribe.color;
+      
+      for (const terr of tribe.territories) {
+        const px = terr.x * pixelsPerTileX;
+        const py = terr.y * pixelsPerTileY;
+        
+        const neighbors = [
+          { dx: -1, dy: 0 }, { dx: 1, dy: 0 },
+          { dx: 0, dy: -1 }, { dx: 0, dy: 1 }
+        ];
+        
+        for (const n of neighbors) {
+          const nx = (terr.x + n.dx + TILE_WIDTH) % TILE_WIDTH;
+          const ny = terr.y + n.dy;
+          
+          if (ny < 0 || ny >= TILE_HEIGHT) continue;
+          
+          const isOwn = tribe.territories.some(t => t.x === nx && t.y === ny);
+          
+          if (!isOwn) {
+            overlayCtx.beginPath();
+            if (n.dx === -1) {
+              overlayCtx.moveTo(px, py);
+              overlayCtx.lineTo(px, py + pixelsPerTileY);
+            } else if (n.dx === 1) {
+              overlayCtx.moveTo(px + pixelsPerTileX, py);
+              overlayCtx.lineTo(px + pixelsPerTileX, py + pixelsPerTileY);
+            } else if (n.dy === -1) {
+              overlayCtx.moveTo(px, py);
+              overlayCtx.lineTo(px + pixelsPerTileX, py);
+            } else if (n.dy === 1) {
+              overlayCtx.moveTo(px, py + pixelsPerTileY);
+              overlayCtx.lineTo(px + pixelsPerTileX, py + pixelsPerTileY);
+            }
+            overlayCtx.stroke();
+          }
+        }
+      }
+    }
+  }
+  
   // Draw labels
   overlayCtx.textAlign = 'center';
   overlayCtx.textBaseline = 'middle';
-  overlayCtx.shadowColor = 'rgba(0, 0, 0, 0.8)';
-  overlayCtx.shadowBlur = 4;
+  overlayCtx.shadowColor = 'rgba(0, 0, 0, 0.9)';
+  overlayCtx.shadowBlur = 6;
   
+  // Draw country labels
   for (const country of gameState.countries) {
     if (country.territories.length === 0) continue;
     
@@ -1572,11 +1625,11 @@ function renderOverlay() {
       sumX += terr.x;
       sumY += terr.y;
     }
-    const centerX = (sumX / country.territories.length) * pixelsPerTileX;
-    const centerY = (sumY / country.territories.length) * pixelsPerTileY;
+    const centerX = (sumX / country.territories.length) * pixelsPerTileX + pixelsPerTileX / 2;
+    const centerY = (sumY / country.territories.length) * pixelsPerTileY + pixelsPerTileY / 2;
     
-    // Font size based on territory size
-    const fontSize = Math.max(12, Math.min(40, country.territories.length * 2));
+    // Font size based on territory size (scaled better)
+    const fontSize = Math.max(14, Math.min(48, country.territories.length * 2.5));
     overlayCtx.font = `bold ${fontSize}px Arial`;
     overlayCtx.fillStyle = '#ffffff';
     
@@ -1591,10 +1644,10 @@ function renderOverlay() {
         sumX += terr.x;
         sumY += terr.y;
       }
-      const centerX = (sumX / tribe.territories.length) * pixelsPerTileX;
-      const centerY = (sumY / tribe.territories.length) * pixelsPerTileY;
+      const centerX = (sumX / tribe.territories.length) * pixelsPerTileX + pixelsPerTileX / 2;
+      const centerY = (sumY / tribe.territories.length) * pixelsPerTileY + pixelsPerTileY / 2;
       
-      const fontSize = Math.max(8, Math.min(16, tribe.territories.length * 1.5));
+      const fontSize = Math.max(10, Math.min(20, tribe.territories.length * 2));
       overlayCtx.font = `${fontSize}px Arial`;
       overlayCtx.fillStyle = '#eeeeee';
       
@@ -1607,7 +1660,8 @@ function renderOverlay() {
   renderCamera();
 }
 
-mapCanvas.addEventListener('mousedown', (e) => {
+// Click to view info
+mapCanvas.addEventListener('click', (e) => {
   const rect = mapCanvas.getBoundingClientRect();
   const mouseX = e.clientX - rect.left;
   const mouseY = e.clientY - rect.top;
@@ -1656,14 +1710,6 @@ mapCanvas.addEventListener('mousedown', (e) => {
       return;
     }
   }
-  
-  // Normal drag behavior
-  camera.isDragging = true;
-  camera.dragStartX = e.clientX;
-  camera.dragStartY = e.clientY;
-  camera.dragStartCamX = camera.x;
-  camera.dragStartCamY = camera.y;
-  mapCanvas.style.cursor = 'grabbing';
 });
 
 function showTileInfo(tile) {
@@ -1741,22 +1787,46 @@ document.getElementById('closeInfoPanel').addEventListener('click', () => {
   document.getElementById('infoPanel').style.display = 'none';
 });
 
-window.addEventListener('mousemove', (e) => {
-  if (!camera.isDragging) return;
-  
-  const dx = e.clientX - camera.dragStartX;
-  const dy = e.clientY - camera.dragStartY;
-  
-  camera.x = camera.dragStartCamX - dx / camera.zoom;
-  camera.y = camera.dragStartCamY - dy / camera.zoom;
-  
-  renderCamera();
+// Keyboard controls for camera movement
+window.addEventListener('keydown', (e) => {
+  if (e.key in keys || e.key === 'w' || e.key === 'a' || e.key === 's' || e.key === 'd') {
+    keys[e.key] = true;
+    e.preventDefault();
+  }
 });
 
-window.addEventListener('mouseup', () => {
-  camera.isDragging = false;
-  mapCanvas.style.cursor = 'grab';
+window.addEventListener('keyup', (e) => {
+  if (e.key in keys || e.key === 'w' || e.key === 'a' || e.key === 's' || e.key === 'd') {
+    keys[e.key] = false;
+    e.preventDefault();
+  }
 });
+
+function updateCameraMovement() {
+  let moved = false;
+  const speed = camera.moveSpeed / camera.zoom;
+  
+  if (keys.w || keys.ArrowUp) {
+    camera.y -= speed;
+    moved = true;
+  }
+  if (keys.s || keys.ArrowDown) {
+    camera.y += speed;
+    moved = true;
+  }
+  if (keys.a || keys.ArrowLeft) {
+    camera.x -= speed;
+    moved = true;
+  }
+  if (keys.d || keys.ArrowRight) {
+    camera.x += speed;
+    moved = true;
+  }
+  
+  if (moved) {
+    renderCamera();
+  }
+}
 
 window.addEventListener('wheel', (e) => {
   if (e.ctrlKey || e.metaKey) {
@@ -1808,7 +1878,7 @@ mapCanvas.addEventListener('wheel', (e) => {
   renderCamera();
 }, { passive: false });
 
-mapCanvas.style.cursor = 'grab';
+mapCanvas.style.cursor = 'default';
 
 function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -1862,6 +1932,9 @@ function gameLoop() {
       lastTickTime = now;
     }
   }
+  
+  // Update camera movement every frame
+  updateCameraMovement();
   
   requestAnimationFrame(gameLoop);
 }
